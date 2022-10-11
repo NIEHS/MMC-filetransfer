@@ -1,0 +1,8 @@
+MMC.egg-info
+__pycache__
+.DS_Store
+settings.json
+bbcp*
+.env
+config/groups.yaml
+config/contact_emails.txt

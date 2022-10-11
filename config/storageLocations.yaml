@@ -1,0 +1,13 @@
+staging:
+  status: staging
+  root: /datastaging/data/gatan_movies
+  storage_type: local
+longTerm:
+  status: longTerm
+  root: /ddn/cryoemCore/data/projects_niehs
+  storage_type: nfs
+cluster:
+  status: cluster
+  root: /data/Cryoem/projects_niehs
+  SSHstring: helix.nih.gov
+  storage_type: 'remote'

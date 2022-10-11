@@ -1,0 +1,149 @@
+groups:
+  add:
+    help: 'Add new group' 
+    package: 'MMC.preprocess.commands'
+    splitArgs: True
+    method: 'add_group'
+    args: 
+      - name: name
+        type: str
+        help: 'Name of the group'
+      - name: affiliation
+        type: str
+        help: Affiliation for the group
+        choices: [NIEHS, NICE, Collaborations]
+      # - name: projects
+      #   help: 'List of projects to add'
+      #   type: str
+      #   nargs: '+'
+  list:
+    help: 'List all groups or specific group'
+    package: 'MMC.preprocess.commands'
+    method: 'display_group_info'
+    splitArgs: True
+    args:
+      - name: name
+        type: str
+        help: Optional name of group, leave empty for all groups.
+        default: __all__
+  add_project:
+    help: 'Add project to the specific group'
+    package: 'MMC.preprocess.commands'
+    method: 'add_projects_to_group'
+    splitArgs: True
+    args:
+      - name: group
+        type: str
+        help: Name of the group into which the project should be added
+      - name: name
+        help: Name of project to add
+        type: str
+      - name: emails
+        type: str
+        help: List of emails to be added to that project for notifications.
+        nargs: '+'
+  add_emails:
+    help: Add emails to a project
+    package: MMC.preprocess.commands
+    method: add_email_to_project
+    splitArgs: True
+    args:
+      - name: project
+        type: str
+        help: Group.project names. i.e. BorniaM.Spikeproject
+      - name: emails
+        type: str
+        help: List of emails to be added to that project for notifications.
+        nargs: '+'
+    
+session:
+  setup:
+    help: Initiates the session
+    splitArgs: False
+    package: MMC.preprocess.session
+    method: 'initiate_session'
+    args:
+      - name: source
+        type: str
+        help: 'Path to the directory where the movies are saved'
+      - name: group
+        type: str
+        help: 'Name of the group for the data collection'
+      - name: project
+        type: str
+        help: 'Name of the project for the data collection'
+      - name: sample
+        type: str
+        help: 'Name of the sample for the session'
+      - name: scope
+        type: str
+        help: 'Name of the scope for the session'
+        choices: [niehs_arctica, niehs_krios, niehs_krios_epu]
+      - name: magnification
+        type: str
+        help: 'Maginification used for collecting data'
+      - name: pixelSize
+        type: float
+        help: Pixel size used for the data collection
+      - name: totalDose
+        type: float
+        help: Total electron dose for each image in e/A2
+      - name: frameNumber
+        type: int
+        help: Number of frames recorded
+      - name: detectorCounts
+        type: float
+        help: Counts on the detector over vaccum (empty area) in e/pix/s for the Acquisition mag.
+      - name: mode
+        type: str
+        help: Data collection mode
+        default: spr
+        choices: [spr, tomo]
+        help: 'Whether it is a single-particle or SPR data collection'
+      - name: tiltAngleOrScheme
+        default: '0'
+        type: str
+        help: For bookeepbing only. Note of the tilt angle or tilt scheme used for collection
+      - name: filesPattern
+        type: str
+        help: Wildcard pattern for which files to pick up. Must include an extention. i.e. 20220925_*.tif or *.tif
+      - name: gainReference
+        type: str
+        help: Wildcard or specific pattern for the gain reference file. i.e. *.dm4, gain_reference.mrc
+      - name: date
+        type: str
+        help: Override the collection date. YYYYMMDD
+  transfer:
+    help: Starts file transfer to staging and long-term storage
+    splitArgs: True
+    package: MMC.preprocess.session
+    method: run_transfer
+    async: True
+    args:
+      - name: session
+        type: str
+        help: Name of the session under the YYYYMMDD_sessionName format.
+      - name: duration
+        type: float
+        help: Expected duration or remaining duration of the file transfer in hours. The transfer will automatically terminate after that time.
+      - name: cluster
+        action: store_true
+  preprocess:
+    help: Start the preprocessing
+    splitArgs: True
+    package: MMC.preprocess.session
+    method: preprocess
+    async: False
+    args:
+      - name: session
+        type: str
+        help: Name of the session under the YYYYMMDD_sessionName format.
+      - name: timeout
+        default: 16
+        type: int
+        help: Expected duration or remaining duration of the preprocessing in hours.
+      - name: scipion
+        action: store_true   
+
+
+
