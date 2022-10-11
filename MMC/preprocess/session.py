@@ -263,7 +263,7 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False):
             await location.transfer([Movie(file, delete=False),Movie(transfer_obj.logfile,delete=False)],location.session_path)
 
 def preprocess(session: str, scipion:bool=True, timeout:float=16):
-    from mmc.lib.scipion_workflow import scipion_template
+    from MMC.lib.scipion_workflow import scipion_template
     file, session = load_session_from_file(session)
 
     if scipion:
