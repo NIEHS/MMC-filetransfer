@@ -45,10 +45,3 @@ class scipion_template:
                     print(f'missing {key}:{k}')
                     complete = False
         return complete
-
-
-if __name__ == "__main__":
-    test = scipion_template()
-    test.set_scope_defaults('niehs')
-    test.save_template(None)
-    test.check_completion()

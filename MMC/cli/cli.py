@@ -8,10 +8,14 @@ def load_commands(cli_file):
 def create_parser_from_yaml(command):
     parser = argparse.ArgumentParser(command['help'])
     for arg in command['args']:
-        name = f"-{arg.pop('name')}"
+        name = arg.pop('name')
+        if 'required' in arg and arg.pop('required'):
+            names = [name]
+        else:
+            names = [f"-{name}",f"--{name}"]
         if 'type' in arg:
             arg['type'] =  eval(arg['type'])
-        parser.add_argument(name, **arg)
+        parser.add_argument(*names, **arg)
 
     return parser
 

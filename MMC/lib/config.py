@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     
     # group: str
     HTML: Path
-    scipion_loc: Path
+    # scipion_loc: Path
     logs: Path
+    log_level: str
 
     #STMP
     sender_email: str
@@ -25,3 +26,4 @@ class Settings(BaseSettings):
     class Config:
         env_file = config_path / '.env'
         env_file_encoding = 'utf-8'
+

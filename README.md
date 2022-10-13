@@ -1,6 +1,6 @@
 # MMC file transfer and preprocessing
 
-This python package is mainly used to transfer raw data from cryo-TEM data collection from the microscope computer to staging, long-term and computing cluster areas and simplify the preprocessing of the data.
+This python package is mainly used to transfer raw data from cryo-TEM data collection from the microscope computer to staging, long-term and computing cluster areas and simplify the preprocessing of the data. It organizes the data into groups and projects during filetransfer.
 
 This new version also keeps track of data collection parameters and saves them alongside the data for future reference. This information is espacially important when writing up the materials and methods section of manuscripts.
 
@@ -52,6 +52,7 @@ To get started, an enviroment files needs to be created. There is a template fil
 
     # Local area to store the logs
     logs = '' #Where the initial information about the transfer session is saved
+    log_level = 'INFO' #Set the log_level to 'INFO' or 'DEBUG'
 
     # Emails
     sender_email = '' #Who is sending the email notifications
@@ -60,11 +61,10 @@ To get started, an enviroment files needs to be created. There is a template fil
 
     # Scipion
     HTML = ''  #Path to where the scipion static html reports should be placed
-    scipion_loc = '' #Where the scipion projects are being saved
     ```
 3. Setup storage locations. Open `config/storageLocations.yaml` in a text editor.
     
-    There are 3 locations that can be set up. Staging, longTerm, cluster.
+    There are 4 locations that can be set up. staging, longTerm, cluster, and scipion.
     ```yaml
     staging: #required
       status: staging
@@ -79,6 +79,11 @@ To get started, an enviroment files needs to be created. There is a template fil
       root: /data/Cryoem/projects_niehs #Change path to the cluster location
       SSHstring: helix.nih.gov #Change to the ssh hostname of your cluster
       storage_type: 'remote' #Will use bbcp to transfer the files to the cluster
+    scipion:
+      status: scipion
+      root: /data-edison/Scipion/
+      SSHstring: edison
+      storage_type: remote
     ```
 
 4. Set up mailing list for warnings and errors.
@@ -94,7 +99,9 @@ To get started, an enviroment files needs to be created. There is a template fil
 
 ## One-time setup for each users
 
-If you are planning on using remote ssh-based transfers, please [set up an ssh key](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-2) for passwordless transfers.
+If you are planning on using remote ssh-based transfers, please [set up an ssh key](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-2) for passwordless transfers. 
+
+If `scipion` is set as `storage_type: remote`, an ssh key to that host will also be required.
 
 ## Activating the environment
 
@@ -127,13 +134,15 @@ There are 2 main commands, groups and session and then sub-commands with a summa
 ```
 #Example
 $ mmc.py groups add -h
-usage: Add new group [-h] [-name NAME] [-affiliation {NIEHS,NICE,Collaborations}]
+usage: Add new group [-h] name {NIEHS,NICE,Collaborations}
+
+positional arguments:
+  name                  Name of the group
+  {NIEHS,NICE,Collaborations}
+                        Affiliation for the group
 
 options:
   -h, --help            show this help message and exit
-  -name NAME            Name of the group
-  -affiliation {NIEHS,NICE,Collaborations}
-                        Affiliation for the group
 ```
 
 ## Editing groups
@@ -147,10 +156,9 @@ To add a group, provide a name and an affiliation:
     - NIEHS: For local NIEHS users
     - NICE: For intramural users part of the NICE consortium
     - Collaborations: For external collaborators
-
 ```
 # Example
-$ mmc.py -name BorgniaM -affiliation NIEHS
+$ mmc.py BorgniaM NIEHS
 {'name': 'BorgniaM', 'affiliation': 'NIEHS'}
 Adding name='BorgniaM' affiliation='NIEHS' projects=[]
 ```
@@ -163,7 +171,7 @@ To add a project into an existing group, the following will need to be provided:
 
 ```
 # Example
-$mmc.py groups add_project -group BorgniaM -name Project1 -emails student@univ.gov trainee@nih.gov
+$mmc.py groups add_project BorgniaM Project1 -emails student@univ.gov trainee@nih.gov
 {'group': 'BorgniaM', 'name': 'Project1', 'emails': ['student@univ.gov', 'trainee@nih.gov']}
 ```
 
@@ -174,7 +182,7 @@ To add emails to an already existing project
 
 ```
 # Example
-$ mmc.py groups add_emails -project BorgniaM.Project1 -emails newTrainee@nih.gov anotherPerson@nih.gov
+$ mmc.py groups add_emails BorgniaM.Project1 -emails newTrainee@nih.gov anotherPerson@nih.gov
 {'project': 'BorgniaM.Project1', 'emails': ['newTrainee@nih.gov', 'anotherPerson@nih.gov']}
 ############################################################
 Group:          BorgniaM
@@ -196,8 +204,8 @@ $ mmc.py groups list
 Group:          BorgniaM
 Affiliation:    NIEHS
 Pojects:
-     Project1: student@univ.gov, trainee@nih.gov, newTrainee@nih.gov, anotherPerson@nih.gov
-     Project2: student2@univ.gov, trainee@nih.gov
+     Project1: student@univ.edu, trainee@nih.gov, newTrainee@nih.gov, anotherPerson@nih.gov
+     Project2: student2@univ.edu, trainee@nih.gov
 ############################################################
 ############################################################
 Group:          testing
@@ -216,8 +224,8 @@ $ mmc.py groups list -name BorgniaM
 Group:          BorgniaM
 Affiliation:    NIEHS
 Pojects:
-     Project1: student@univ.gov, trainee@nih.gov, newTrainee@nih.gov, anotherPerson@nih.gov
-     Project2: student2@univ.gov, trainee@nih.gov
+     Project1: student@univ.edu, trainee@nih.gov, newTrainee@nih.gov, anotherPerson@nih.gov
+     Project2: student2@univ.edu, trainee@nih.gov
 ############################################################
 ```
 
@@ -286,7 +294,7 @@ After creation, a session can be run for preprocessing and file transfer. The co
 - Whether or not to move the raw data to the cluser (optional)
 
 ```
-$ mmc.py session transfer -session 20221011_ApoferritinSample1 -duration 16
+$ mmc.py session transfer 20221011_ApoferritinSample1 -duration 16
 ```
 **It is recommended to use tmux or screen to run this command**
 
@@ -294,6 +302,34 @@ $ mmc.py session transfer -session 20221011_ApoferritinSample1 -duration 16
 The created session can also be preprocessed with Scipion automatically with the `mmc.py session preprocess` command. The command will create a scipion project for the session and initiate the project when the gain reference file has been transfered.
 
 ```
-$ mmc.py session preprocess -session 20221011_ApoferritinSample1 -scipion -duration 16
+$ mmc.py session preprocess 20221011_ApoferritinSample1 -duration 16
 ```
 
+## Directory Structure and files
+
+### Master directory
+One of the main areas to find data and log files is in the `log` directory specified in the `.env` file. In tha area you will find:
+
+- A master log file for everything that happened in the past 14 days, located in `logs/mmc.log`
+- For existing session as directory in `YYYMMDD_sampleName`.
+  - That directory contains the session parameters as `session.yaml`
+  - The session log file as `session.log`
+  - The list of files that were transfered in csv format as `transfer.list`
+  - If scipion preprocessing was run, the submitted scipion workflow template as `workflow_template.json`
+
+### Sessions raw data directory
+The raw data coming for the microscope will be automatically copied into the specified `staging` and `longTerm` areas specified in `storageLocations.yaml`. The data will be organized as follows:
+
+- **For NIEHS users**: The directory structure will be `groupName/projecName/YYYYMMDD_sampleName`
+- **For NICE users**: The directory structure will be `NICE/groupName/projecName/YYYYMMDD_sampleName`
+- **For external collaborations**: The directory structure will be `BorgniaM/collaborations/groupName/projecName/YYYYMMDD_sampleName`
+
+In each directory, you will find a copy of the `session.yaml` and a `raw` directory where the raw `*.tif` or `*.mrc` along with `.mdoc` files will be found.
+
+## Automated emails
+
+Automated emails will be send upon errors and idling in transfers.
+
+- **On errors**: An email will be sent to all addresses in `config/contact_emails.txt`. It will contain the information in `session.yaml` and a traceback of the error to help with troubleshooting.
+- **On idle**: If no new files have been found in the source directory for a certain period (45 minutes), an warning email will be sent to all addresses in `config/contact_emails.txt`. This email doesn't mean that something is wrong but may uncover an underlying error in the microscope software or simply inform that all targets were acquired.
+- **On completition**: When the session duration has been met, a completion email will be sent to all addresses in `config/contact_emails.txt` as well as all adresses attached in the session's project. It will inform the "owners" of the specimen that their data collection has finished and give them a copy of the microscope parameters, number of images, duration[...] that is saved in `session.yaml`

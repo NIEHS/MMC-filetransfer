@@ -1,24 +1,22 @@
 groups:
   add:
     help: 'Add new group' 
-    package: 'MMC.preprocess.commands'
+    package: 'MMC.preprocess.groups'
     splitArgs: True
     method: 'add_group'
     args: 
       - name: name
         type: str
         help: 'Name of the group'
+        required: True
       - name: affiliation
         type: str
         help: Affiliation for the group
         choices: [NIEHS, NICE, Collaborations]
-      # - name: projects
-      #   help: 'List of projects to add'
-      #   type: str
-      #   nargs: '+'
+        required: True
   list:
     help: 'List all groups or specific group'
-    package: 'MMC.preprocess.commands'
+    package: 'MMC.preprocess.groups'
     method: 'display_group_info'
     splitArgs: True
     args:
@@ -28,29 +26,32 @@ groups:
         default: __all__
   add_project:
     help: 'Add project to the specific group'
-    package: 'MMC.preprocess.commands'
+    package: 'MMC.preprocess.groups'
     method: 'add_projects_to_group'
     splitArgs: True
     args:
       - name: group
         type: str
         help: Name of the group into which the project should be added
+        required: True
       - name: name
         help: Name of project to add
         type: str
+        required: True
       - name: emails
         type: str
         help: List of emails to be added to that project for notifications.
         nargs: '+'
   add_emails:
     help: Add emails to a project
-    package: MMC.preprocess.commands
+    package: MMC.preprocess.groups
     method: add_email_to_project
     splitArgs: True
     args:
       - name: project
         type: str
-        help: Group.project names. i.e. BorniaM.Spikeproject
+        help: Group.project names. i.e. BorgniaM.SpikeProject
+        required: True
       - name: emails
         type: str
         help: List of emails to be added to that project for notifications.
@@ -99,7 +100,7 @@ session:
         help: Data collection mode
         default: spr
         choices: [spr, tomo]
-        help: 'Whether it is a single-particle or SPR data collection'
+        help: Whether it is a single-particle or SPR data collection
       - name: tiltAngleOrScheme
         default: '0'
         type: str
@@ -123,27 +124,36 @@ session:
       - name: session
         type: str
         help: Name of the session under the YYYYMMDD_sessionName format.
+        required: True
       - name: duration
         type: float
         help: Expected duration or remaining duration of the file transfer in hours. The transfer will automatically terminate after that time.
+        default: 16
       - name: cluster
+        help: Add this argument to move files to the cluster.
+        action: store_true
+      - name: remove
+        help: Add this argument to remove the files from the source directory after transfer.
         action: store_true
   preprocess:
     help: Start the preprocessing
     splitArgs: True
     package: MMC.preprocess.session
     method: preprocess
-    async: False
+    async: True
     args:
       - name: session
         type: str
         help: Name of the session under the YYYYMMDD_sessionName format.
-      - name: timeout
+        required: True
+      - name: duration
         default: 16
         type: int
         help: Expected duration or remaining duration of the preprocessing in hours.
       - name: scipion
-        action: store_true   
+        help: Will start scipion preprocessing
+        action: store_true
+        default: True  
 
 
 

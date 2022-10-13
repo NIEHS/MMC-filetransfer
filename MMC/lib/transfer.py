@@ -10,7 +10,9 @@ import subprocess as sub
 import shlex
 from MMC import settings
 import asyncio
+import logging
 
+logger = logging.getLogger(__name__)
 
 def str_to_bool(s):
     if s == 'True':
@@ -143,9 +145,9 @@ class Transfer:
         self.gain_done = True
 
 def bbcp(fileList:List[Movie], destination:Path, label:str):
-    print('Transfering with bbcp')
+    logger.info('Transfering with bbcp')
     command = f"""{settings.env.bbcp} -a -f -v {' '.join([f"'{str(f.path)}'" for f in fileList])} '{destination}'"""
-    print(command)
+    logger.debug(command)
     bbcp_process = sub.Popen(shlex.split(command),stdout=sub.PIPE, stderr=sub.STDOUT)
     os.set_blocking(bbcp_process.stdout.fileno(), False)
     pattern = re.compile(r'.*File\s.*/(.*)\screated.*')
@@ -153,7 +155,7 @@ def bbcp(fileList:List[Movie], destination:Path, label:str):
     while True:
         line= bbcp_process.stdout.readline().decode()
         if bbcp_process.poll() is not None and not line:
-            print('bbcp transfer finished')
+            logger.info('bbcp transfer finished')
             break
         if not line:
             time.sleep(0.5)
@@ -163,7 +165,34 @@ def bbcp(fileList:List[Movie], destination:Path, label:str):
             mic = next((x for x in fileList if x.path.name == mic and label not in x.status), None)
             if mic is not None:
                 mic.status.append(label)
-                print(f'Transfered {mic.path.name}')
+                logger.info(f'Transfered {mic.path.name}')
+
+    return fileList
+
+def rsync(fileList:List[Movie], destination:Path, label:str):
+    logger.info('Transfering with rsync')
+    command = f"""rsync -vogt --info=name2 {' '.join([f"'{str(f.path)}'" for f in fileList])} '{destination}'"""
+    logger.debug(command)
+    rsync_process = sub.Popen(shlex.split(command),stdout=sub.PIPE, stderr=sub.STDOUT)
+    os.set_blocking(rsync_process.stdout.fileno(), False)
+    pattern = re.compile(r'^([\w\.]+)\n$')
+    pattern2 = re.compile(r'^([\w\.]+) is uptodate\n$') 
+    while True:
+        line= rsync_process.stdout.readline().decode()
+        # print(line)
+        if rsync_process.poll() is not None and not line:
+            logger.info('rsync transfer finished')
+            break
+        if not line:
+            time.sleep(0.5)
+            continue
+        finds = re.findall(pattern, line) + re.findall(pattern2, line)
+        # print('Find!',finds)
+        for mic in finds:
+            mic = next((x for x in fileList if x.path.name == mic and label not in x.status), None)
+            if mic is not None:
+                mic.status.append(label)
+                logger.info(f'Transfered {mic.path.name}')
 
     return fileList
 
@@ -173,14 +202,14 @@ def copy(f, destination, label):
     file = f.path
     try:
         new_loc = shutil.copy2(file, destination)
-        print(f'Copied {f.path.name}')
+        logger.info(f'Copied {f.path.name}')
     except:
-        print(f'Could not locate file at {file}. ',end="")
+        logger.info(f'Could not locate file at {file}. ',end="")
         new_loc = os.path.join(destination,f.path.name)
         if os.path.isfile(new_loc):
-            print('Found at destination')
+            logger.info('Found at destination')
         else:
-            print('Not found at destination, skipping for now.')
+            logger.info('Not found at destination, skipping for now.')
             return f
     if os.path.getsize(file) == os.path.getsize(new_loc):
         f.status += label
@@ -196,7 +225,7 @@ def remove_from_source(files_list, delete_status: list = ['staging']):
                     deleted = True
                     f.status.append('deleted')
                 except Exception as e:
-                    print(f'Error removing {f.path}, {e}, trying again in 2 seconds')
+                    logger.debug(f'Error removing {f.path}, {e}, trying again in 2 seconds')
                     time.sleep(2)
     
     return files_list

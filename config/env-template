@@ -5,8 +5,8 @@ scipion_path = '/usr/local/scipion-3.0/scipion3'
 
 # local-machine-related paths
 HTML = ''
-scipion_loc = ''
 logs = ''
+log_level = 'INFO'
 
 # Emails
 sender_email = ''

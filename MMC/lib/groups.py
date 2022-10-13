@@ -1,8 +1,7 @@
+import logging
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import yaml
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class Project(BaseModel):
 
     def add_email(self,email):
         if email in self.emailList:
-            print(f'{email} already in {self.name} project, skipping')
+            logger.info(f'{email} already in {self.name} project, skipping')
             return
         self.emailList.append(email)
 
@@ -36,8 +35,10 @@ class Group(BaseModel):
     projects: List[Project]
 
     def add_project(self, name:str, emailList:List[str]):
-        if name in  list(map(lambda x : x.name, self.projects)):
+        if name in list(map(lambda x : x.name, self.projects)):
             logger.info(f'Project {name} already exists for group {self.name}')
+            return
+        logger.info(f'Adding project {name} to group {self.name}')
         self.projects.append(Project(name=name, emailList=emailList)) 
     
     def print_self(self):
@@ -46,10 +47,14 @@ class Group(BaseModel):
             string += f"\n{' ':5}{p.print_self()}"
         return f"""{'#'*60}\n{'Group:':<15} {self.name}\n{'Affiliation:':<15} {self.affiliation}\n{'Pojects:':}{string}\n{'#'*60}"""
 
-def load_groups(groups_file):
+def load_groups(groups_file) -> dict:
+    output_groups= {}
+    if not groups_file.exists():
+        return output_groups
     with open(groups_file) as f:
         groups = yaml.safe_load(f)
-    output_groups= {}
+    if groups is None:
+        return output_groups
     for group in groups:
         group = Group.parse_obj(group)
         output_groups[group.name] = group

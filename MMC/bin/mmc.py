@@ -1,8 +1,12 @@
+import logging
 from MMC import settings
 import sys
 import MMC.cli.cli as cli
 import importlib
 import asyncio
+
+logger = logging.getLogger(__name__)
+
 
 if __name__ == "__main__":
     args = sys.argv
@@ -15,7 +19,7 @@ if __name__ == "__main__":
 
     module = importlib.import_module(command['package'])
     method = getattr(module, command['method'])
-    print(parsed_args)
+    logger.info(f"Command received: {command['package']}.{command['method']} Arguments: {parsed_args}")
     if 'async' not in command or not command['async']:
         if command['splitArgs']:
             method(**parsed_args)

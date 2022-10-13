@@ -10,7 +10,6 @@ setup(
     packages=['MMC'],  # same as name
     install_requires=['pydantic', 'python-dotenv', 'pyyaml'],  # external packages as dependencies
     scripts=[
-        'bin/mmc.py',
+        'MMC/bin/mmc.py',
     ],
-
 )

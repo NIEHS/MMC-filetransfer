@@ -1,17 +1,22 @@
+import logging
 from MMC import settings
 from MMC.lib.groups import Group, ProjectDoesNotExistError, save_groups
 from typing import Optional, List
 
+logger = logging.getLogger(__name__)
+
 def add_group(name:str, affiliation:str):
     if name in settings.groups:
-        print(f'Group {name} already exists')
+        logger.info(f'Group {name} already exists')
         return 
     group = Group(name=name,affiliation=affiliation,projects=[])
-    print(f'Adding {group}')
+    logger.info(f'Adding {group}')
     settings.groups[name] = group
     save_groups(settings.groups, settings.groups_file)
 
 def add_projects_to_group(group:str, name:List[str], emails:List[str]):
+    if emails is None:
+        emails = [] 
     settings.groups[group].add_project(name=name,emailList=emails)
     save_groups(settings.groups, settings.groups_file)
 
