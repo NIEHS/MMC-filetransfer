@@ -87,4 +87,4 @@ niehs_Krios = {
     "gpuList": "2 3"
 }
 
-
+scopes = {'niehs_arctica': niehs_arctica, 'niehs_krios_epu': niehs_Krios_EPU, 'niehs_krios': niehs_Krios}

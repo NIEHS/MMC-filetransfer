@@ -81,7 +81,7 @@ class Session(BaseModel):
 
     @property
     def longTermDir(self):
-        return settings.env.ddn_root / settings.env.ddn_raw_dir / self.specific_path
+        return  settings.storageLocations['longTerm'].root / self.specific_path
 
     @property
     def stagingDir(self):
@@ -114,6 +114,51 @@ class Session(BaseModel):
             return v
         raise ProjectDoesNotExistError()
 
+    def to_string(self) -> str:
+        pretty_dict = {  
+                    'Session Information': {
+                        'Session Name': self.session,
+                        'Group': self.group,
+                        'Project': self.project,
+                        'Data location': str(self.longTermDir),
+                        'Collection type': self.mode,
+                        'Status': self.status
+                        },
+                    'Scope Parameters': {
+                        'Magnification': f'{int(self.magnification):,} X',
+                        'Pixel Size': f'{self.pixelSize} A/pix',
+                        'Total Dose': f'{self.totalDose} e/A2',
+                        'Total frames': f'{self.frameNumber} frames',
+                        'Raw detector count': f'{self.detectorCounts} e/pix/sec',
+                        'Voltage': f"{settings.scopes[self.scope]['voltage']} keV",
+                        'Spherical Abberation': f"{settings.scopes[self.scope]['sphericalAberration']} nm",
+                        'Tilt angle/scheme': self.tiltAngleOrScheme,
+                    },
+                    'Statistics': {
+                        'Number of movies': self.numberOfMovies,
+                        'Start time': self.startTime,
+                        'End time': self.endTime,
+                        'Duration': f'{self.durationInHours} h'
+                    },
+                    'Source inputs': {
+                        'Source directory': self.sourceDir,
+                        'Gain Reference': self.gainReference,
+                        'File Pattern': self.filesPattern,
+                        'Scope': self.scope
+                    }
+                }
+        output = ''
+        # output ="<html>\n<head>\n</head>\n<body>\n"
+        for key,val in pretty_dict.items():
+            output += '\n'+ '#'*len(key) + f'\n{key}\n' + '#'*len(key) + '\n\n'
+            # output += {key}\n' + '#'*len(key) + '\n\n'
+            for k,v in val.items():
+                k = f'{k}:'
+                output += f"{k} {v}\n"
+        # output +="</body>\n</html>"
+        return output
+
+
 def save_session(session:Session, directory:Path = settings.env.logs):
     path = directory / session.session
     path.mkdir(exist_ok=True)
@@ -121,10 +166,6 @@ def save_session(session:Session, directory:Path = settings.env.logs):
     with open(file, 'w') as f:
         f.write(yaml.dump(session.dict()))
     logger.info(f'Created settings file for session {session.session} at {file}')
-
-def initiate_session(session: Session):
-    session= Session.parse_obj({k:v for k,v in session.items() if v is not None})
-    save_session(session)
 
 def load_session_from_file(session:str):
     file = settings.env.logs / session / 'settings.yaml'

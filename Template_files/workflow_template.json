@@ -41,7 +41,7 @@
     },
     "motioncor": {
         "object.className": "ProtMotionCorr",
-        "object.id": "64",
+        "object.id": "66",
         "object.label": "motioncorr - movie alignment",
         "object.comment": "",
         "_useQueue": false,
@@ -86,7 +86,7 @@
     },
     "ctffind": {
         "object.className": "CistemProtCTFFind",
-        "object.id": "124",
+        "object.id": "128",
         "object.label": "cistem - ctffind4",
         "object.comment": "",
         "_useQueue": false,
@@ -120,7 +120,7 @@
     },
     "monitor": {
         "object.className": "ProtMonitorSummary",
-        "object.id": "385",
+        "object.id": "185",
         "object.label": "emfacilities - monitor summary",
         "object.comment": "",
         "_useQueue": false,
@@ -128,9 +128,9 @@
         "runName": null,
         "runMode": 0,
         "inputProtocols": [
-            "124",
+            "128",
             "2",
-            "64"
+            "66"
         ],
         "samplingInterval": 60,
         "stddevValue": 0.04,

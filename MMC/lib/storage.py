@@ -75,7 +75,7 @@ class NSFStorageLocation(LocalStorageLocation):
 
     async def transfer(self, fileList:List[Movie], destination:Path):
         if is_nfs_available(destination.parent):
-            return super().transfer(fileList,destination)
+            return await super().transfer(fileList,destination)
         return fileList
     
     def make_session_dir(self):

@@ -140,7 +140,7 @@ class Transfer:
         if 'dm' in path.suffix:
             gain = convert_gain(path,destination) 
         else:
-            gain = shutil.copyfile(path,destination / f'gain.{path.suffix}')                
+            gain = shutil.copyfile(path,destination / f'gain{path.suffix}')                
         self.transfer_list.append(Movie(str(gain),timestamp=os.path.getctime(path), status=['staging'] ,delete=False))
         self.gain_done = True
 

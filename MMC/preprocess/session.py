@@ -3,7 +3,7 @@ import time
 from MMC.lib.email import send_email
 from MMC.lib.logger_settings import add_log_handlers
 from MMC.lib.transfer import Movie, Transfer, remove_from_source, update_source
-from MMC.lib.session import save_session, load_session_from_file
+from MMC.lib.session import save_session, load_session_from_file, Session
 from MMC.lib.scipion_workflow import scipion_template
 from pathlib import Path
 from MMC import settings
@@ -12,11 +12,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def initiate_session(session: Session):
+    session= Session.parse_obj({k:v for k,v in session.items() if v is not None})
+    save_session(session)
+
 async def run_transfer(session:str, duration:float=16, cluster:bool=False, remove:bool=False):
     
     nochange = 0
-    nochange_sleep = 120
-    idle_time_notification = 2
+    nochange_sleep = 60
+    idle_time_notification = 1
     pool = 5
     restart = True
     duration_in_seconds = duration*60*60
@@ -71,7 +75,7 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
                 logging.warning(f'Sending email.')
                 send_email(
                     title= f'WARNING: {session.session} No files found in {idle_time:.0f} mintues', 
-                    message= f'Something may be wrong with data collection.\nSession information:\n\n{file.read_text()}',
+                    message= f'Something may be wrong with data collection.\n\n{session.to_string()}',
                     #contacts= session.project_obj.emailList
                     )
             if time.time() - start_time >= duration_in_seconds:
@@ -113,7 +117,7 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
         session.status = 'error'
         send_email(
             title= f'ERROR: {session.session}', 
-            message= f'The file transfer has terminated unexpectedly.\nSession information:\n\n{file.read_text()}\n\nTraceback:\n{traceback.format_exc()}',
+            message= f'The file transfer has terminated unexpectedly.\n\n{session.to_string()}\n\nTraceback:\n{traceback.format_exc()}',
             #contacts= session.project_obj.emailList
             )
     finally:
@@ -126,7 +130,7 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
         if session.status == 'completed':
             send_email(
                 title= f'COMPLETED: {session.session} is finished.', 
-                message= f'Session information:\n\n{file.read_text()}',
+                message= session.to_string(),
                 contacts= session.project_obj.emailList
                 )
         for location in transfer_locations:

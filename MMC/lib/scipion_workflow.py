@@ -11,8 +11,8 @@ class scipion_template:
             self.template = json.load(f)
 
     def set_scope_defaults(self, scope):
-        scopes = {'niehs_arctica': settings.niehs_arctica, 'niehs_krios_epu': settings.niehs_Krios_EPU, 'niehs_krios': settings.niehs_Krios}
-        scope_defaults = scopes[scope]
+        
+        scope_defaults = settings.scopes[scope]
 
         for key, val in self.template.items():
             for k, v in val.items():
