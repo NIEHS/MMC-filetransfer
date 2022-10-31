@@ -116,7 +116,7 @@
         "streamingWarning": null,
         "streamingSleepOnWait": 3,
         "streamingBatchSize": 1,
-        "inputMicrographs": "64.outputMicrographs"
+        "inputMicrographs": "66.outputMicrographs"
     },
     "monitor": {
         "object.className": "ProtMonitorSummary",

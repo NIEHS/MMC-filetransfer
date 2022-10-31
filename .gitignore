@@ -6,3 +6,4 @@ bbcp*
 .env
 config/groups.yaml
 config/contact_emails.txt
+node_modules

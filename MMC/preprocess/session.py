@@ -1,8 +1,9 @@
 from copy import copy
+import shutil
 import time
 from MMC.lib.email import send_email
 from MMC.lib.logger_settings import add_log_handlers
-from MMC.lib.transfer import Movie, Transfer, remove_from_source, update_source
+from MMC.lib.transfer import Movie, Transfer, check_file, remove_from_source, update_source
 from MMC.lib.session import save_session, load_session_from_file, Session
 from MMC.lib.scipion_workflow import scipion_template
 from pathlib import Path
@@ -19,8 +20,8 @@ def initiate_session(session: Session):
 async def run_transfer(session:str, duration:float=16, cluster:bool=False, remove:bool=False):
     
     nochange = 0
-    nochange_sleep = 60
-    idle_time_notification = 1
+    nochange_sleep = 120
+    idle_time_notification = 45
     pool = 5
     restart = True
     duration_in_seconds = duration*60*60
@@ -39,7 +40,7 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
     save_session(session)
     transfer_obj = Transfer(session.sourceDir, delete=remove, logdir=file.parent, filesPattern=session.filesPattern, gainReference=session.gainReference)
 
-    logging.info('Initiating transfer')
+    logger.info('Initiating transfer')
     try:
         transfer_locations = [settings.storageLocations['staging'], settings.storageLocations['longTerm']]
         if cluster:
@@ -58,34 +59,32 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
                     if pattern.exists():
                         gainfiles += [pattern]
                         break
-                gainfiles += session.source.glob(pattern)
+                gainfiles = list(session.source.glob(pattern))
             if gainfiles:
                 gainfiles.sort(key= lambda x: x.stat().st_ctime)
                 transfer_obj.process_gain(gainfiles[0], transfer_locations[0].session_raw_path)
                 break
-            logging.info(f'Gain reference with patterns {transfer_obj.gainReference} not found, waiting 2 min.')
+            logger.info(f'Gain reference with patterns {transfer_obj.gainReference} not found, waiting 2 min.')
             time.sleep(120)
         session.status = 'transferring'
         save_session(session)
         while True:
             idle_time = nochange*nochange_sleep/60
-            logging.warning(f'No files were found in the last {idle_time:.1f} minutes.')
             if idle_time >= idle_time_notification and time.time() - email_sent_time >= email_send_timeout*60:
                 email_sent_time = time.time()
-                logging.warning(f'Sending email.')
+                logger.warning(f'Sending email.')
                 send_email(
                     title= f'WARNING: {session.session} No files found in {idle_time:.0f} mintues', 
                     message= f'Something may be wrong with data collection.\n\n{session.to_string()}',
-                    #contacts= session.project_obj.emailList
                     )
             if time.time() - start_time >= duration_in_seconds:
-                logging.info(f'Time limit of {duration}h has been reached')
+                logger.info(f'Time limit of {duration}h has been reached')
                 break
 
             new_files = transfer_obj.list_source()
-            if not new_files and not restart: 
+            if not new_files and not restart:
                 nochange += 1
-                logging.info(f'Will look for files again in {nochange_sleep/60:.1f} min')
+                logger.info(f'No files were found in the last {idle_time:.1f} minutes. Will look for files again in {nochange_sleep/60:.1f} min')
                 time.sleep(nochange_sleep)
                 continue
 
@@ -97,20 +96,20 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
                 if not transfer_obj.get_subset(final_status,pool=pool):
                     break
                 for location in transfer_locations:
-                    logging.info(f'Moving files to {location.status} {location.session_raw_path}.')
+                    logger.info(f'Moving files to {location.status} {location.session_raw_path}.')
                     to_transfer = transfer_obj.get_subset([location.status],pool=pool)
                     if len(to_transfer) == 0:
                         continue
                     results = await location.transfer(to_transfer,location.session_raw_path)
                     if transfer_obj.delete and location.status =='staging':
                         results = remove_from_source(results,delete_status=[location.status])
-                    if location.status == 'staging':
+                    if set(location.status) == set(['staging','deleted']):
                         results = update_source(results,location.session_raw_path)
                     transfer_obj.tansfer_list = set(transfer_obj.transfer_list).update(results)
                     transfer_obj.save()
         session.status = 'completed'
     except KeyboardInterrupt:
-        logging.info('Interrupting')
+        logger.info('Interrupting')
         session.status = 'killed'
     except Exception as err:
         logger.exception(err)
@@ -118,10 +117,9 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
         send_email(
             title= f'ERROR: {session.session}', 
             message= f'The file transfer has terminated unexpectedly.\n\n{session.to_string()}\n\nTraceback:\n{traceback.format_exc()}',
-            #contacts= session.project_obj.emailList
             )
     finally:
-        logging.info('Saving and exiting.')
+        logger.info('Saving and exiting.')
         session.set_endTime()
         session.set_duration()
         session.numberOfMovies = len([f for f in transfer_obj.transfer_list if not '.mdoc' in f.path.name and not 'gain' in f.path.name]) - 1
@@ -142,7 +140,7 @@ async def preprocess(session: str, scipion:bool=True, duration:float=16):
 
     if scipion:
         storage_location = settings.storageLocations['scipion']
-        logging.info('Creating scipion workflow')
+        logger.info('Creating scipion workflow')
         html_destination = settings.env.HTML / session.group / 'reports'
         phpFile = html_destination.parent / 'index.php'
         storage_location.mkdir(phpFile.parent)
@@ -164,16 +162,56 @@ async def preprocess(session: str, scipion:bool=True, duration:float=16):
             return 
         wf = workflow.save_template(file.parent/'scipion_workflow.json')
         scipion_session_directory = storage_location.mkdir(session.specific_path)
-        logging.info('All arguments for scipion processing present.\nCreating Scipion project. Scheduling will occur after the gain is transfered.')
+        logger.info('All arguments for scipion processing present.\nCreating Scipion project. Scheduling will occur after the gain is transfered.')
         command = f"""{str(settings.env.scipion_path)} python -m pyworkflow.project.scripts.create "{session.session}" "{wf}" "{str(scipion_session_directory.parent)}" """
         storage_location.sub_run(command)
         time.sleep(5)
         while True:
             _, session = load_session_from_file(session.session)
             if len(list(raw_path.glob('gain*'))) > 0:
-                logging.info('Found gain in import directory. Starting Scipion.')
+                logger.info('Found gain in import directory. Starting Scipion.')
                 command = f"{str(settings.env.scipion_path)} python -m pyworkflow.project.scripts.schedule {session.session}"
                 p = storage_location.sub_Popen(command)   
                 return
-            logging.info('Waiting 2 min for gain file to be transfered.')
-            time.sleep(120)             
+            logger.info('Waiting 2 min for gain file to be transfered.')
+            time.sleep(120) 
+
+async def checkFiles(session:str, directory:str, force:bool=False, action:str='move'): 
+    import asyncio
+    file, session = load_session_from_file(session)
+
+    transfer_obj = Transfer(session.sourceDir, logdir=file.parent, filesPattern=session.filesPattern, gainReference=session.gainReference)
+
+    location = settings.storageLocations[directory]
+    location.set_session_path(session.specific_path)
+
+    total=0
+    transfer_list = copy(transfer_obj.transfer_list)
+    pool_limit = 50
+    while transfer_list:
+        fileList = []
+        while len(fileList) < pool_limit and transfer_list:
+            file = transfer_list.pop()
+            if force:
+                file.status = list(set(file.status).difference(['checkOK','incomplete','corrupted']))
+            if any(['.mdoc' in file.path.name,'Ref' in file.path.name,'gain' in file.path.name, 'checkOK' in file.status, 'corrupted' in file.status, 'incomplete' in file.status]):
+                continue
+            fileList.append(file)
+        tasks = [asyncio.to_thread(check_file, file=file, source=location.session_raw_path, expected_frames=session.frameNumber)for file in fileList]
+        results = await asyncio.gather(*tasks)
+        transfer_obj.tansfer_list = set(transfer_obj.transfer_list).update(results)
+        transfer_obj.save()
+        total += pool_limit
+        logger.info(f'Processed {total} files.')
+    
+    corrupted = list(filter(lambda x: any(['corrupted' in x.status, 'incomplete' in x.status]), transfer_obj.transfer_list))
+    logger.info(f'Found {len(corrupted)} corrupted or incomplete files.')
+    if action == 'move':
+        directory = location.session_raw_path / 'corrupted'
+        logger.info(f'Moving files to {directory}')
+        directory.mkdir(exist_ok=True)
+        for file in corrupted:
+            shutil.move(location.session_raw_path/file.path.name, 'corrupted')
+
+
+

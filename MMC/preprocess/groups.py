@@ -34,8 +34,9 @@ def display_group_info(name:str='__all__'):
     if name == '__all__':
         for _, group in settings.groups.items():
             print(group.print_self())
-        return
+        return settings.groups
     print(settings.groups[name].print_self())
+    return settings.groups[name]
 
 
     

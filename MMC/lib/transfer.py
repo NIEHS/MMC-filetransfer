@@ -86,7 +86,7 @@ class Transfer:
 
 
     def load(self):
-        print('loading')
+        # print('loading')
         with open(self.logfile, 'r') as file:
             lines = file.read().splitlines()
         for f in lines:
@@ -113,7 +113,7 @@ class Transfer:
                 #Check if file is still being written if not there for 20+ minute
                 if f.stat().st_ctime < 1200:
                     init_size = f.stat().st_size
-                    time.sleep(0.2)
+                    time.sleep(1)
                     if init_size != f.stat().st_size:
                         continue
                 m = Movie(path=f)
@@ -124,7 +124,7 @@ class Transfer:
         self.transfer_list.sort(key=lambda x: x.timestamp)
         return new_files
 
-    def get_subset(self,label:List,pool=5):
+    def get_subset(self,label:List,pool=5,no_meta=False):
         chunk_size=0
         subset=[]
         for f in self.transfer_list:
@@ -133,6 +133,8 @@ class Transfer:
             if not set(label).issubset(f.status):
                 if f.path.suffix in ['.mdoc', '.tiff']:
                     chunk_size += 1
+                if f.path.suffix == '.mdoc' and no_meta:
+                    continue
                 subset.append(f)
         return subset
 
@@ -179,7 +181,6 @@ def rsync(fileList:List[Movie], destination:Path, label:str):
     pattern2 = re.compile(r'^([\w\.]+) is uptodate\n$') 
     while True:
         line= rsync_process.stdout.readline().decode()
-        # print(line)
         if rsync_process.poll() is not None and not line:
             logger.info('rsync transfer finished')
             break
@@ -187,7 +188,6 @@ def rsync(fileList:List[Movie], destination:Path, label:str):
             time.sleep(0.5)
             continue
         finds = re.findall(pattern, line) + re.findall(pattern2, line)
-        # print('Find!',finds)
         for mic in finds:
             mic = next((x for x in fileList if x.path.name == mic and label not in x.status), None)
             if mic is not None:
@@ -204,7 +204,7 @@ def copy(f, destination, label):
         new_loc = shutil.copy2(file, destination)
         logger.info(f'Copied {f.path.name}')
     except:
-        logger.info(f'Could not locate file at {file}. ',end="")
+        logger.info(f'Could not locate file at {file}. ')
         new_loc = os.path.join(destination,f.path.name)
         if os.path.isfile(new_loc):
             logger.info('Found at destination')
@@ -221,11 +221,11 @@ def remove_from_source(files_list, delete_status: list = ['staging']):
             deleted= False
             while not deleted: 
                 try:
-                    Path(f.path).unlink()
+                    Path(f.path.name).unlink()
                     deleted = True
                     f.status.append('deleted')
                 except Exception as e:
-                    logger.debug(f'Error removing {f.path}, {e}, trying again in 2 seconds')
+                    logger.debug(f'Error removing {f.path.name}, {e}, trying again in 2 seconds')
                     time.sleep(2)
     
     return files_list
@@ -239,6 +239,23 @@ async def async_transfer_local(fileList:List[Movie], destination:Path, label:str
     tasks = [asyncio.to_thread(copy, f,destination,label=[label])for f in fileList]
     return await asyncio.gather(*tasks)
 
+def check_file(file: Movie, source:Path, expected_frames:int) -> Movie:
+    command = f"header {str(source/ file.path.name)}"
+    command = sub.run(shlex.split(command),stdout=sub.PIPE, stderr=sub.PIPE)
+    output = command.stdout.decode()
 
+    pattern = re.compile(r'Start\scols,.*\d+\s+\d+\s+(\d+)\n')
+    if 'ERROR:' in output:
+        logger.info(f'File: {file} is corrupted')
+        file.status.append('corrupted')
+        return file
+    m = re.search(pattern,output)
+    result = m.group(1) if m else 0
+    logger.debug(f'Frames= {result} in {file}')
+    if int(result) != expected_frames:
+        logger.info(f'File: {file} is incomplete')
+        file.status.append('incomplete')
+        return file
 
-
+    file.status.append('checkOK')
+    return file
