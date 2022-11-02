@@ -28,8 +28,8 @@ app.add_middleware(
 logger = logging.getLogger(__name__)
 
 @app.get('/groups/list/')
-async def display_goup_info(name: str='__all__'):
-    return MMC.preprocess.groups.display_group_info(name)
+async def display_group_info():
+    return settings.groups
 
 @app.post('/groups/add', status_code=status.HTTP_201_CREATED, )
 async def add_group(group:Group,response:Response):
@@ -39,13 +39,15 @@ async def add_group(group:Group,response:Response):
         return settings.groups[group.name]
     settings.groups[group.name] = group
     save_groups(settings.groups, settings.groups_file)
-    return group
+    return settings.groups
 
-@app.put('/groups/update')
+@app.patch('/groups/update')
 async def update_group(group:Group,response:Response):
     settings.groups[group.name] = group
-    save_groups(settings.groups, settings.groups_file)
-    return group
+    groups = save_groups(settings.groups, settings.groups_file)
+    logger.info(f'Updated group {group}')
+    logger.info(f'{groups}')
+    return groups
 
 @app.post('/session/setup/')
 async def session_setup(session:Session, status_code=status.HTTP_201_CREATED):

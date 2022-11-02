@@ -32,7 +32,7 @@ class Project(BaseModel):
 class Group(BaseModel):
     name: str
     affiliation: str
-    projects: List[Project]
+    projects: List[Project] = Field(default_factory=list)
 
     def add_project(self, name:str, emailList:List[str]):
         if name in list(map(lambda x : x.name, self.projects)):
@@ -66,6 +66,7 @@ def save_groups(groups, groups_file):
         export_groups.append(group.dict())
     with open(groups_file, 'w') as f:
         f.write(yaml.dump(export_groups))
+    return groups
 
 
 
