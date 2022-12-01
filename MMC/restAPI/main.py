@@ -6,6 +6,7 @@ from MMC.lib.session import Session, load_session_from_file, save_session
 from MMC import settings
 import MMC.preprocess.groups
 import logging
+import textwrap
 
 from MMC.preprocess.session import preprocess, run_transfer
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,7 @@ app = FastAPI()
 origins = [
     "http://localhost",
     "http://localhost:8080",
+    "http://mri20-dtn01:8080"
 ]
 
 app.add_middleware(
@@ -52,7 +54,12 @@ async def update_group(group:Group,response:Response):
 @app.post('/session/setup/')
 async def session_setup(session:Session, status_code=status.HTTP_201_CREATED):
     save_session(session)
-    return session
+    response= dict(session=session.session, 
+    commands=['ssh mri20-dtn01',
+    'conda activate /datastaging/conda_env/MMC', 
+    f'mmc.py session transfer {session.session} --duration 16',
+    f'mmc.py session preprocess {session.session} --duration 16'])
+    return response
 
 @app.get('/session/{sessionName}')
 async def session_get(sessionName:str):
@@ -73,6 +80,18 @@ async def session_log(sessionName:str) -> List[str]:
 async def session_preprocess(background_tasks: BackgroundTasks,sessionName:str, scipion:bool=True, duration:int=16):
     background_tasks.add_task(preprocess, sessionName, scipion=scipion, duration=duration)
     return {"message": f"{sessionName} precessing started", 'session': sessionName }
+
+@app.get('/scopes/', response_model=List[str])
+async def list_scopes() -> List[str]:
+    return list(settings.scopes.keys())
+
+@app.get('/path/')
+async def list_path(value:str):
+    path = Path(value)
+    root = Path(path.parent)
+    remainder = path.name + '*'
+    if root.exists:
+        return root.glob(remainder)
 
 
 

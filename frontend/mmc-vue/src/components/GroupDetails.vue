@@ -1,6 +1,6 @@
 <template>
     <div class="col row">
-        <h1>Groups Details</h1>
+        <h2>Groups Details</h2>
         <div v-if="store.activeGroup != null" class="col-12 row">
             <span class="col-6">Name:</span><input class="col-6" :value="store.activeGroup.name">
             <span class="col-6">Affiliation:</span><input class="col-6" :value="store.activeGroup.affiliation">

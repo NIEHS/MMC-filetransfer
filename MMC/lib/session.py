@@ -107,7 +107,10 @@ class Session(BaseModel):
             return v
         else:
             raise GroupDoesNotExistError()
-    
+    @validator('date')
+    def remove_date_hypens(cls,v, values):
+        return v.replace('-','')
+
     @validator('project')
     def is_project_exists(cls,v, values):
         if v in list(map(lambda x: x.name, settings.groups[values['group']].projects)):
@@ -148,27 +151,29 @@ class Session(BaseModel):
                     }
                 }
         output = ''
-        # output ="<html>\n<head>\n</head>\n<body>\n"
         for key,val in pretty_dict.items():
             output += '\n'+ '#'*len(key) + f'\n{key}\n' + '#'*len(key) + '\n\n'
-            # output += {key}\n' + '#'*len(key) + '\n\n'
             for k,v in val.items():
                 k = f'{k}:'
                 output += f"{k} {v}\n"
-        # output +="</body>\n</html>"
         return output
 
 
 def save_session(session:Session, directory:Path = settings.env.logs):
-    path = directory / session.session
-    path.mkdir(exist_ok=True)
+    path = directory / session.group / session.project / session.session
+    path.mkdir(exist_ok=True,parents=True)
     file = path / 'settings.yaml'
     with open(file, 'w') as f:
         f.write(yaml.dump(session.dict()))
     logger.info(f'Created settings file for session {session.session} at {file}')
 
 def load_session_from_file(session:str):
-    file = settings.env.logs / session / 'settings.yaml'
+    file = list(settings.env.logs.glob(f'*/*/{session}/settings.yaml'))
+    num_file = len(file)
+
+    assert num_file == 1, f'Found {num_file} session with {session} name. Expected to find only one.'
+
+    file = file[0]
     if not file.is_file():
         logger.info(f'No file found at {file}. Perhaps the session does not exist.')
         return

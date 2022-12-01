@@ -1,9 +1,11 @@
 <template>
-  <div id=main class="container row">
+  <div id=main class="container">
+    <div class="row">
     <h1>MMC page</h1>
     <MMCGroups></MMCGroups>
     <GroupDetails></GroupDetails>
     <SetupRun></SetupRun>
+    </div>
   </div>
 </template>
 

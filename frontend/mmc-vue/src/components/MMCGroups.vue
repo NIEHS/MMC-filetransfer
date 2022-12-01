@@ -9,11 +9,13 @@
                     </div>
             </div>
         </div>
-        <div v-for="group in store.groups" :key="group.name">
+        <div class="col-12 row p-2">
+        <div v-for="group in store.groups" :key="group.name" class="col-auto p-0">
             <button class="btn btn-outline-primary" type="button" v-on:click="selectGroup(group)">
                       {{ group.name }}
                     </button>
         </div>
+    </div>
     </div>
 </template>
 

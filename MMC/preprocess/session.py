@@ -54,12 +54,13 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
             logging.info('Looking for gain reference.')
             gainfiles = []
             for pattern in transfer_obj.gainReference:
+                logger.debug(f'Checking gain Pattern {pattern}')
                 if Path(pattern).is_absolute:
                     pattern = Path(pattern)
                     if pattern.exists():
                         gainfiles += [pattern]
                         break
-                gainfiles = list(session.source.glob(pattern))
+                gainfiles += list(session.source.glob(str(pattern)))
             if gainfiles:
                 gainfiles.sort(key= lambda x: x.stat().st_ctime)
                 transfer_obj.process_gain(gainfiles[0], transfer_locations[0].session_raw_path)

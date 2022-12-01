@@ -107,7 +107,8 @@ class Transfer:
         files_done = [p.path.name for p in self.transfer_list]
         patterns = self.filesPattern
         for pattern in patterns:
-            files +=  self.source.glob(pattern)
+            logger.debug(f'Loooking for files at {str(self.source)}/{pattern}')
+            files +=  list(self.source.glob(pattern))
         for f in files:
             if f.name not in files_done and time.time() - f.stat().st_ctime > minfiletime:
                 #Check if file is still being written if not there for 20+ minute
