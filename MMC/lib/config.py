@@ -23,6 +23,10 @@ class Settings(BaseSettings):
 
     template_files: Path = project_path / 'Template_files'
 
+    @property
+    def sessionsDirectory(self):
+        return self.logs / 'sessions'
+
     class Config:
         env_file = config_path / '.env'
         env_file_encoding = 'utf-8'

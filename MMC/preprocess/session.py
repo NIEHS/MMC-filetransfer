@@ -50,7 +50,7 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
             location.set_session_path(session.specific_path)
             location.make_session_dir() 
         
-        while not transfer_obj.gain_done:
+        while not transfer_obj.gain_done and not session.gainCorrected:
             logging.info('Looking for gain reference.')
             gainfiles = []
             for pattern in transfer_obj.gainReference:
@@ -148,10 +148,11 @@ async def preprocess(session: str, scipion:bool=True, duration:float=16):
         await storage_location.transfer([Movie(Path(settings.env.template_files,'index.php'))], phpFile)
         raw_path = settings.storageLocations['staging'].set_session_path(session.specific_path) / 'raw'
         workflow = scipion_template()
+
         workflow.set_values([
                 ('import', 'filesPath', str(raw_path)),
                 ('import', 'timeout', 240*60),
-                ('import', 'gainFile', str(raw_path / 'gain.mrc') if not 'epu' in session.scope else str(raw_path / 'gain.tiff')),
+                ('import', 'gainFile', session.get_gain_file(raw_path)),
                 ('monitor', 'monitorTime', int(duration * 60)),
                 ('monitor', 'publishCmd', f'rsync -avL %(REPORT_FOLDER)s {html_destination}'),
                 ('import', 'dosePerFrame', session.totalDose/ session.frameNumber),
@@ -169,8 +170,8 @@ async def preprocess(session: str, scipion:bool=True, duration:float=16):
         time.sleep(5)
         while True:
             _, session = load_session_from_file(session.session)
-            if len(list(raw_path.glob('gain*'))) > 0:
-                logger.info('Found gain in import directory. Starting Scipion.')
+            if len(list(raw_path.glob('gain*'))) > 0 or session.gainCorrected:
+                logger.info('All of scipion requirements are satisfied. Starting preprocessing.')
                 command = f"{str(settings.env.scipion_path)} python -m pyworkflow.project.scripts.schedule {session.session}"
                 p = storage_location.sub_Popen(command)   
                 return

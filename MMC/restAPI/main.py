@@ -2,11 +2,9 @@ from pathlib import Path
 from typing import List
 from fastapi import FastAPI, status, Response, BackgroundTasks
 from MMC.lib.groups import Group, save_groups
-from MMC.lib.session import Session, load_session_from_file, save_session
+from MMC.lib.session import Session, load_session_from_file, save_session, find_session_directory, filter_sessions
 from MMC import settings
-import MMC.preprocess.groups
 import logging
-import textwrap
 
 from MMC.preprocess.session import preprocess, run_transfer
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,6 +49,16 @@ async def update_group(group:Group,response:Response):
     logger.info(f'{groups}')
     return groups
 
+@app.get('/sessions/find/')
+async def find_sessions(group:str='*',project:str='*',session:str='*'):
+    sessions = filter_sessions(group,project,session)
+    return [session.name for session in sessions]
+
+# @app.get('/sessions/find/{pattern}')
+# async def find_sessions(pattern:str='*'):
+#     sessions = search_sessions(pattern)
+#     return [session.name for session in sessions]
+
 @app.post('/session/setup/')
 async def session_setup(session:Session, status_code=status.HTTP_201_CREATED):
     save_session(session)
@@ -66,17 +74,18 @@ async def session_get(sessionName:str):
     _, session = load_session_from_file(sessionName)
     return session
 
-@app.post('/session/{sessionName}/start/')
+@app.post('/session/{sessionName}/start')
 async def session_start(background_tasks: BackgroundTasks, sessionName:str,duration:int=16,remove:bool=False):
     background_tasks.add_task(run_transfer, sessionName,duration,remove=remove)
     return {"message": f"{sessionName} started", 'session': sessionName }
 
 
 @app.get('/session/{sessionName}/log')
-async def session_log(sessionName:str) -> List[str]:
-    return Path(settings.env.logs / sessionName / 'session.log').read_text().split('\n')[-200:]
+async def session_log(sessionName:str, lineNumber:int=200) -> List[str]:
+    sessionPath = find_session_directory(sessionName)
+    return {'log':Path(sessionPath / 'session.log').read_text().split('\n')[-lineNumber:]}
 
-@app.get('/session/{sessionName}/preprocess/')
+@app.get('/session/{sessionName}/preprocess')
 async def session_preprocess(background_tasks: BackgroundTasks,sessionName:str, scipion:bool=True, duration:int=16):
     background_tasks.add_task(preprocess, sessionName, scipion=scipion, duration=duration)
     return {"message": f"{sessionName} precessing started", 'session': sessionName }

@@ -114,6 +114,10 @@ session:
       - name: date
         type: str
         help: Override the collection date. YYYYMMDD
+      - name: gainCorrected
+        help: Add this argument if the data is already gain corrected.
+        action: store_true
+        default: False
   transfer:
     help: Starts file transfer to staging and long-term storage
     splitArgs: True

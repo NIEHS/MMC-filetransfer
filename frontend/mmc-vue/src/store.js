@@ -8,3 +8,8 @@ export const store = reactive({
 export const state = reactive({
     newGroupMenu:false
 })
+
+export const sessionLog = reactive({
+    isLog: false,
+    sessionName: null,
+})

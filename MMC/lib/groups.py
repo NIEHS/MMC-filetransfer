@@ -2,6 +2,7 @@ import logging
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import yaml
+from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def load_groups(groups_file) -> dict:
     for group in groups:
         group = Group.parse_obj(group)
         output_groups[group.name] = group
-    return output_groups
+    return OrderedDict(sorted(output_groups.items()))
 
 def save_groups(groups, groups_file):
     export_groups = []

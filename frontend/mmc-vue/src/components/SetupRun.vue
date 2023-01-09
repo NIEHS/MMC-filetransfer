@@ -6,16 +6,20 @@
 
             
             <div class="row">
-                <div class="col-8">
+                <div class="col-5">
                     <label>{{session.sample.label}}</label>
-            <input :type="session.sample.type" class="form-control" id="setupSourceDir" v-model="session.sample.value">
+                    <input :type="session.sample.type" class="form-control" id="setupSourceDir" v-model="session.sample.value">
+                </div>
+                <div class="col-3">
+                    <label>{{session.date.label}}</label>
+                    <input :type="session.date.type" class="form-control" id="setupFilesPattern" v-model="session.date.value">
                 </div>
                 <div class="col-4">
                     <label>{{session.scope.label}}</label>
-            <select class="form-control" id="setupLabel" v-model="session.scope.value">
-                <option value="" disabled selected hidden>Choose a microscope</option>
-                <option v-for="choice in session.scope.choices" :key="choice">{{choice}}</option>
-            </select>
+                    <select class="form-control" id="setupLabel" v-model="session.scope.value">
+                        <option value="" disabled selected hidden>Choose a microscope</option>
+                        <option v-for="choice in session.scope.choices" :key="choice">{{choice}}</option>
+                    </select>
                 </div>
             </div>
 
@@ -28,49 +32,40 @@
             <div><span v-for="path in gainReferencePathList" :key="path" class='badge rounded-pill bg-primary'>{{path}}</span></div>
     
             <div class="row">
-                <div class="col-8">
+                <div class="col-4">
                     <label>{{session.filesPattern.label}}</label>
                     <input :type="session.filesPattern.type" class="form-control" id="setupFilesPattern" v-model="session.filesPattern.value">
                 </div>
+
                 <div class="col-4">
-                    <label>{{session.date.label}}</label>
-                    <input :type="session.date.type" class="form-control" id="setupFilesPattern" v-model="session.date.value">
-                </div>
-            </div>
-    
-            <div class="row">
-                <div class="col-6">
                     <label>{{session.group.label}}</label>
                     <select class="form-control" id="setupLabel" v-model="session.group.value">
                 <option value="" disabled selected hidden>Choose a group</option>
                 <option v-for="choice in session.group.choices" :key="choice">{{choice}}</option>
             </select>
                 </div>
-                <div class="col-6">
+                <div class="col-4">
                     <label>{{session.project.label}}</label>
                     <select class="form-control" id="setupLabel" v-model="session.project.value">
-                <option value="" disabled selected hidden>Choose a project</option>
-                <option v-for="choice in projectChoices" :key="choice">{{choice}}</option>
-            </select>
+                        <option value="" disabled selected hidden>Choose a project</option>
+                        <option v-for="choice in projectChoices" :key="choice">{{choice}}</option>
+                    </select>
                 </div>
-            </div>
-
-    
-
-            <div class="row">
-                <div class='col-6' v-for="field in [session.pixelSize]" :key="field.label">
+            <!-- </div>
+            <div class="row"> -->
+                <div class='col-4' v-for="field in [session.pixelSize]" :key="field.label">
                     <label>{{field.label}}</label>
                     <input :type="field.type" step="0.01" class="form-control" id="setupSourceDir" v-model="field.value">
                 </div>
-                <div class='col-4' v-for="field in [session.magnification,session.totalDose,session.detectorCounts,session.frameNumber]" :key="field.label">
+                <div class='col-4' v-for="field in [session.magnification,session.totalDose,session.detectorCounts,session.frameNumber,session.tiltAngleOrScheme]" :key="field.label">
                     <label>{{field.label}}</label>
                     <input :type="field.type" class="form-control" id="setupSourceDir" v-model="field.value">
                 </div>
-            </div>
+            
     
-            <label>{{session.tiltAngleOrScheme.label}}</label>
-            <input :type="session.tiltAngleOrScheme.type" class="form-control" id="setupTiltAngleOrScheme" v-model="session.tiltAngleOrScheme.value">
-    
+            <!-- <label>{{session.tiltAngleOrScheme.label}}</label>
+            <input :type="session.tiltAngleOrScheme.type" class="form-control" id="setupTiltAngleOrScheme" v-model="session.tiltAngleOrScheme.value"> -->
+            </div>  
             <button v-if="!submitting" class="btn btn-primary" @click="submit">Submit</button>
             
             <button v-if="submitting" class="btn btn-primary" type="button" disabled>

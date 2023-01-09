@@ -1,4 +1,5 @@
 import datetime
+from typing import List
 import time
 from MMC.lib.groups import GroupDoesNotExistError, ProjectDoesNotExistError
 from pathlib import Path
@@ -36,6 +37,7 @@ class Session(BaseModel):
     mode: str = 'spr'
     tiltAngleOrScheme: str = '0'
     filesPattern: str | None = None
+    gainCorrected: bool = False
     gainReference: str | None = None
     date: str = datetime.date.today().strftime("%Y%m%d")
 
@@ -101,6 +103,13 @@ class Session(BaseModel):
             return ['*Ref*', '*Gain*', '*gain*', '*/*/Data/*_gain.tiff']
         return [self.gainReference]
 
+    def get_gain_file(self, raw_path):
+        if self.gainCorrected:
+            return ''
+        if 'epu' in self.scope:
+            return str(raw_path / 'gain.tiff')
+        return str(raw_path / 'gain.mrc')
+
     @validator('group', pre=True)
     def is_group_exists(cls,v):
         if v in settings.groups:
@@ -116,6 +125,12 @@ class Session(BaseModel):
         if v in list(map(lambda x: x.name, settings.groups[values['group']].projects)):
             return v
         raise ProjectDoesNotExistError()
+
+    @validator('gainReference')
+    def is_gain_empty(cls,v, values):
+        if v == '':
+            v= None
+        return v 
 
     def to_string(self) -> str:
         pretty_dict = {  
@@ -159,7 +174,7 @@ class Session(BaseModel):
         return output
 
 
-def save_session(session:Session, directory:Path = settings.env.logs):
+def save_session(session:Session, directory:Path = settings.env.sessionsDirectory):
     path = directory / session.group / session.project / session.session
     path.mkdir(exist_ok=True,parents=True)
     file = path / 'settings.yaml'
@@ -167,13 +182,29 @@ def save_session(session:Session, directory:Path = settings.env.logs):
         f.write(yaml.dump(session.dict()))
     logger.info(f'Created settings file for session {session.session} at {file}')
 
+def find_session_directory(session:str) -> Path:
+    directories = list(settings.env.sessionsDirectory.glob(f'*/*/{session}'))
+    num_dirs = len(directories)
+
+    assert num_dirs == 1, f'Found {num_dirs} session with {session} name. Expected to find only one.'
+    return directories[0]
+
+def filter_sessions(group:str='*',project:str='*',session:str='*') -> List:
+    if session != '*':
+        session = f'*{session}*'
+    return list(settings.env.sessionsDirectory.glob(f'{group}/{project}/{session}'))
+
+# def search_sessions(search:str='*') -> List:
+#     if search != '*':
+#         search = f'*{search}*'
+#     sessions = list(settings.env.sessionsDirectory.glob(f'*/*/{search}'))
+#     logger.debug(sessions)
+#     return sessions
+
 def load_session_from_file(session:str):
-    file = list(settings.env.logs.glob(f'*/*/{session}/settings.yaml'))
-    num_file = len(file)
+    directory = find_session_directory(session)
 
-    assert num_file == 1, f'Found {num_file} session with {session} name. Expected to find only one.'
-
-    file = file[0]
+    file = directory / 'settings.yaml'
     if not file.is_file():
         logger.info(f'No file found at {file}. Perhaps the session does not exist.')
         return

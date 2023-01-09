@@ -8,9 +8,9 @@ export default function (url) {
         errors: null,
         fetching: true
     })
-    const fetchData = async () => {
+    const fetchData = async (filters = '') => {
         try {
-            let resp = await fetch(API_ROOT + url)
+            let resp = await fetch(API_ROOT + url + filters)
             state.response = await resp.json()
             console.log(resp)
         }
