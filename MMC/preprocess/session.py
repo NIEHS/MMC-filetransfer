@@ -3,7 +3,7 @@ import shutil
 import time
 from MMC.lib.email import send_email
 from MMC.lib.logger_settings import add_log_handlers
-from MMC.lib.transfer import Movie, Transfer, check_file, remove_from_source, update_source
+from MMC.lib.transfer import Movie, Transfer, check_files, remove_from_source, update_source
 from MMC.lib.session import save_session, load_session_from_file, Session
 from MMC.lib.scipion_workflow import scipion_template
 from pathlib import Path
@@ -17,7 +17,7 @@ def initiate_session(session: Session):
     session= Session.parse_obj({k:v for k,v in session.items() if v is not None})
     save_session(session)
 
-async def run_transfer(session:str, duration:float=16, cluster:bool=False, remove:bool=False):
+async def run_transfer(session:str, duration:float=16, cluster:bool=False, remove:bool=False, checkFiles:bool=False, noStaging:bool=False, noLongTerm:bool=False, emailLevel:str='all'):
     
     nochange = 0
     nochange_sleep = 120
@@ -42,10 +42,20 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
 
     logger.info('Initiating transfer')
     try:
-        transfer_locations = [settings.storageLocations['staging'], settings.storageLocations['longTerm']]
+        transfer_locations = []
+
+
+        if not noStaging:
+            transfer_locations.append(settings.storageLocations['staging'])
+        if not noLongTerm:
+            transfer_locations.append(settings.storageLocations['longTerm'])
+        else:
+            logger.warning(f'Will not automatically move file to long term storage!')
         if cluster:
             transfer_locations.append(settings.storageLocations['cluster'])
         
+        assert len(transfer_locations) != 0, f'Need to specify at least one location {settings.storageLocations.keys()}'
+
         for location in transfer_locations:
             location.set_session_path(session.specific_path)
             location.make_session_dir() 
@@ -71,7 +81,7 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
         save_session(session)
         while True:
             idle_time = nochange*nochange_sleep/60
-            if idle_time >= idle_time_notification and time.time() - email_sent_time >= email_send_timeout*60:
+            if emailLevel == 'all' and idle_time >= idle_time_notification and time.time() - email_sent_time >= email_send_timeout*60:
                 email_sent_time = time.time()
                 logger.warning(f'Sending email.')
                 send_email(
@@ -102,9 +112,11 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
                     if len(to_transfer) == 0:
                         continue
                     results = await location.transfer(to_transfer,location.session_raw_path)
+                    if checkFiles and location.status =='staging':
+                        results = await check_files(results,source=location.session_raw_path, expected_frames=session.frameNumber, action='move')
                     if transfer_obj.delete and location.status =='staging':
                         results = remove_from_source(results,delete_status=[location.status])
-                    if set(location.status) == set(['staging','deleted']):
+                    if set(['staging','deleted']).issubset(set(location.status)):
                         results = update_source(results,location.session_raw_path)
                     transfer_obj.tansfer_list = set(transfer_obj.transfer_list).update(results)
                     transfer_obj.save()
@@ -115,10 +127,11 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
     except Exception as err:
         logger.exception(err)
         session.status = 'error'
-        send_email(
-            title= f'ERROR: {session.session}', 
-            message= f'The file transfer has terminated unexpectedly.\n\n{session.to_string()}\n\nTraceback:\n{traceback.format_exc()}',
-            )
+        if emailLevel == 'all':
+            send_email(
+                title= f'ERROR: {session.session}', 
+                message= f'The file transfer has terminated unexpectedly.\n\n{session.to_string()}\n\nTraceback:\n{traceback.format_exc()}',
+                )
     finally:
         logger.info('Saving and exiting.')
         session.set_endTime()
@@ -126,7 +139,7 @@ async def run_transfer(session:str, duration:float=16, cluster:bool=False, remov
         session.numberOfMovies = len([f for f in transfer_obj.transfer_list if not '.mdoc' in f.path.name and not 'gain' in f.path.name]) - 1
         save_session(session)
         transfer_obj.save()
-        if session.status == 'completed':
+        if session.status == 'completed' and emailLevel == 'all':
             send_email(
                 title= f'COMPLETED: {session.session} is finished.', 
                 message= session.to_string(),
@@ -179,14 +192,14 @@ async def preprocess(session: str, scipion:bool=True, duration:float=16):
             time.sleep(120) 
 
 async def checkFiles(session:str, directory:str, force:bool=False, action:str='move'): 
-    import asyncio
     file, session = load_session_from_file(session)
-
     transfer_obj = Transfer(session.sourceDir, logdir=file.parent, filesPattern=session.filesPattern, gainReference=session.gainReference)
-
+    to_check = transfer_obj.total_files
     location = settings.storageLocations[directory]
     location.set_session_path(session.specific_path)
+    directory = location.session_raw_path / 'corrupted'
 
+    logger.info(f'Found {to_check} files to check')
     total=0
     transfer_list = copy(transfer_obj.transfer_list)
     pool_limit = 50
@@ -197,23 +210,18 @@ async def checkFiles(session:str, directory:str, force:bool=False, action:str='m
             if force:
                 file.status = list(set(file.status).difference(['checkOK','incomplete','corrupted']))
             if any(['.mdoc' in file.path.name,'Ref' in file.path.name,'gain' in file.path.name, 'checkOK' in file.status, 'corrupted' in file.status, 'incomplete' in file.status]):
+                total +=1
                 continue
             fileList.append(file)
-        tasks = [asyncio.to_thread(check_file, file=file, source=location.session_raw_path, expected_frames=session.frameNumber)for file in fileList]
-        results = await asyncio.gather(*tasks)
+            total += 1
+
+        results = await check_files(fileList,source=location.session_raw_path, expected_frames=session.frameNumber, action=action)
         transfer_obj.tansfer_list = set(transfer_obj.transfer_list).update(results)
         transfer_obj.save()
-        total += pool_limit
-        logger.info(f'Processed {total} files.')
+        logger.info(f'Processed {total}/{to_check} files. {total/to_check*100:.1f} % done.')
     
-    corrupted = list(filter(lambda x: any(['corrupted' in x.status, 'incomplete' in x.status]), transfer_obj.transfer_list))
-    logger.info(f'Found {len(corrupted)} corrupted or incomplete files.')
-    if action == 'move':
-        directory = location.session_raw_path / 'corrupted'
-        logger.info(f'Moving files to {directory}')
-        directory.mkdir(exist_ok=True)
-        for file in corrupted:
-            shutil.move(location.session_raw_path/file.path.name, 'corrupted')
-
+    session.corrupted = transfer_obj.total_corrupted_files
+    logger.info(f'Found {session.corrupted} corrupted or incomplete files.')
+    save_session(session)
 
 

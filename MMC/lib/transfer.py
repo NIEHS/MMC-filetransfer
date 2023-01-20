@@ -72,7 +72,13 @@ class Transfer:
         self.filesPattern = self.set_filesPatterns(filesPattern)
         self.gainReference = self.set_gainReference(gainReference)
 
+    @property
+    def total_files(self):
+        return len(self.transfer_list)
 
+    @property
+    def total_corrupted_files(self):
+        return len(list(filter(lambda x: any(['corrupted' in x.status, 'incomplete' in x.status]), self.transfer_list)))
 
     def set_filesPatterns(self, filesPattern=None):
         if filesPattern is None:
@@ -131,7 +137,8 @@ class Transfer:
         for f in self.transfer_list:
             if chunk_size == pool:
                 break
-            if not set(label).issubset(f.status):
+            if set(label+['corrupted','incomplete']).isdisjoint(f.status):
+            # if not set(label).issubset(f.status):
                 if f.path.suffix in ['.mdoc', '.tiff']:
                     chunk_size += 1
                 if f.path.suffix == '.mdoc' and no_meta:
@@ -252,7 +259,7 @@ def check_file(file: Movie, source:Path, expected_frames:int) -> Movie:
         return file
     m = re.search(pattern,output)
     result = m.group(1) if m else 0
-    logger.debug(f'Frames= {result} in {file}')
+    # logger.debug(f'Frames= {result} in {file}')
     if int(result) != expected_frames:
         logger.info(f'File: {file} is incomplete')
         file.status.append('incomplete')
@@ -260,3 +267,26 @@ def check_file(file: Movie, source:Path, expected_frames:int) -> Movie:
 
     file.status.append('checkOK')
     return file
+
+def move_corrupted_or_incomplete_files(location:Path,corrupted:List):
+    directory = location / 'corrupted'
+    directory.mkdir(exist_ok=True)
+    for file in corrupted:
+        srcFile = location/file.path.name
+        if Path(directory,file.path.name).exists():
+            logger.debug(f'{file.path.name} already in {directory}')
+            continue
+        if srcFile.exists():
+            logger.debug(f'Moving {file.path.name} to {directory}')
+            shutil.move(srcFile, directory)
+            continue
+
+        logger.debug(f'Corrupted file not found')       
+
+async def check_files(fileList:List,source:Path, expected_frames:int,action='move'):
+    tasks = [asyncio.to_thread(check_file, file=file, source=source, expected_frames=expected_frames)for file in fileList]
+    results = await asyncio.gather(*tasks)
+    corrupted = list(filter(lambda x: any(['corrupted' in x.status, 'incomplete' in x.status]), results))
+    if action == 'move':
+        move_corrupted_or_incomplete_files(source,corrupted)
+    return results

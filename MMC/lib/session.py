@@ -1,5 +1,5 @@
 import datetime
-from typing import List
+from typing import List, Tuple
 import time
 from MMC.lib.groups import GroupDoesNotExistError, ProjectDoesNotExistError
 from pathlib import Path
@@ -46,6 +46,7 @@ class Session(BaseModel):
     endTime: str|None = None 
     durationInHours: float|None = None
     numberOfMovies: int|None = None
+    corrupted: int = 0
 
     class Config:
         allow_population_by_field_name = True
@@ -59,6 +60,36 @@ class Session(BaseModel):
     
     def set_endTime(self):
         self.endTime = datetime.datetime.now().strftime(dateformat)
+
+    @classmethod
+    def csv_keys(cls):
+        return [                    
+                'session',
+                'group',
+                'project',
+                'mode',
+                'status',
+                'magnification',
+                'pixelSize',
+                'totalDose',
+                'frameNumber',
+                'detectorCounts',
+                'scope',
+                'tiltAngleOrScheme',
+                'numberOfMovies',
+                'corrupted',
+                'startTime',
+                'endTime',
+                'durationInHours',
+                'sourceDir',
+                'gainReference',
+                'filesPattern',
+                'scope',
+                ]
+
+    @classmethod
+    def csv_keys_string(cls):
+        return ','.join(cls.csv_keys()) + '\n'
     
     @property
     def startTimestamp(self):
@@ -154,6 +185,7 @@ class Session(BaseModel):
                     },
                     'Statistics': {
                         'Number of movies': self.numberOfMovies,
+                        'Number of corrupted movies': self.corrupted,
                         'Start time': self.startTime,
                         'End time': self.endTime,
                         'Duration': f'{self.durationInHours} h'
@@ -173,6 +205,9 @@ class Session(BaseModel):
                 output += f"{k} {v}\n"
         return output
 
+    def csv_string(self):
+        return ','.join([str(getattr(self,key)) for key in self.csv_keys()]) + '\n'
+
 
 def save_session(session:Session, directory:Path = settings.env.sessionsDirectory):
     path = directory / session.group / session.project / session.session
@@ -190,18 +225,15 @@ def find_session_directory(session:str) -> Path:
     return directories[0]
 
 def filter_sessions(group:str='*',project:str='*',session:str='*') -> List:
+    if group != '*' and group not in settings.groups:
+        raise GroupDoesNotExistError
+    if project != '*' and project not in settings.groups[group].projects:
+        raise ProjectDoesNotExistError
     if session != '*':
         session = f'*{session}*'
     return list(settings.env.sessionsDirectory.glob(f'{group}/{project}/{session}'))
 
-# def search_sessions(search:str='*') -> List:
-#     if search != '*':
-#         search = f'*{search}*'
-#     sessions = list(settings.env.sessionsDirectory.glob(f'*/*/{search}'))
-#     logger.debug(sessions)
-#     return sessions
-
-def load_session_from_file(session:str):
+def load_session_from_file(session:str) -> Tuple[str, Session]:
     directory = find_session_directory(session)
 
     file = directory / 'settings.yaml'
