@@ -1,4 +1,9 @@
 import { reactive } from 'vue'
+import VueCookies from 'vue-cookies';
+
+export const auth= reactive({
+    isAuthenticated:  VueCookies.get('Authorization') != null,
+})
 
 export const store = reactive({
     activeGroup: null,

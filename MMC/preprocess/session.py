@@ -223,5 +223,3 @@ async def checkFiles(session:str, directory:str, force:bool=False, action:str='m
     session.corrupted = transfer_obj.total_corrupted_files
     logger.info(f'Found {session.corrupted} corrupted or incomplete files.')
     save_session(session)
-
-

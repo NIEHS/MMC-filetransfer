@@ -78,7 +78,11 @@ class Transfer:
 
     @property
     def total_corrupted_files(self):
-        return len(list(filter(lambda x: any(['corrupted' in x.status, 'incomplete' in x.status]), self.transfer_list)))
+        return len(self.corrupted_files)
+
+    @property
+    def corrupted_files(self):
+        return list(filter(lambda x: any(['corrupted' in x.status, 'incomplete' in x.status]), self.transfer_list))
 
     def set_filesPatterns(self, filesPattern=None):
         if filesPattern is None:
@@ -107,7 +111,7 @@ class Transfer:
                 status = ','.join(f.status)
                 file.write(f'{str(f.path)}\t{status}\t{f.timestamp}\t{f.delete}\n')
 
-    def list_source(self, minfiletime=60, filesPattern=None):
+    def list_source(self, minfiletime=60, checkSizeTime=1200, filesPattern=None):
         files = []
         new_files = False
         files_done = [p.path.name for p in self.transfer_list]
@@ -116,18 +120,22 @@ class Transfer:
             logger.debug(f'Loooking for files at {str(self.source)}/{pattern}')
             files +=  list(self.source.glob(pattern))
         for f in files:
-            if f.name not in files_done and time.time() - f.stat().st_ctime > minfiletime:
-                #Check if file is still being written if not there for 20+ minute
-                if f.stat().st_ctime < 1200:
-                    init_size = f.stat().st_size
-                    time.sleep(1)
-                    if init_size != f.stat().st_size:
-                        continue
-                m = Movie(path=f)
-                m.delete = self.delete
-                self.transfer_list.append(m)
-                del m
-                new_files = True
+            filetime = time.time() - f.stat().st_ctime
+            if f.name in files_done or filetime < minfiletime:
+                continue
+            #Check if file is still being written if not there for 20+ minute
+            if filetime < checkSizeTime:
+                logger.debug(f'Checking if {f} is fully written.')
+                init_size = f.stat().st_size
+                time.sleep(1)
+                if init_size != f.stat().st_size:
+                    logger.debug(f'{f} is was not fully written. Skipping for now.')
+                    continue
+            m = Movie(path=f)
+            m.delete = self.delete
+            self.transfer_list.append(m)
+            del m
+            new_files = True
         self.transfer_list.sort(key=lambda x: x.timestamp)
         return new_files
 
@@ -281,11 +289,18 @@ def move_corrupted_or_incomplete_files(location:Path,corrupted:List):
             shutil.move(srcFile, directory)
             continue
 
-        logger.debug(f'Corrupted file not found')       
+        logger.debug(f'Corrupted file not found')
 
 async def check_files(fileList:List,source:Path, expected_frames:int,action='move'):
-    tasks = [asyncio.to_thread(check_file, file=file, source=source, expected_frames=expected_frames)for file in fileList]
-    results = await asyncio.gather(*tasks)
+    results = []
+    tasks = []
+    for file in fileList:
+        if any(['.mdoc' in file.path.name,'Ref' in file.path.name,'gain' in file.path.name, 'checkOK' in file.status, 'corrupted' in file.status, 'incomplete' in file.status]):
+            results.append(file)
+            continue
+        tasks.append(asyncio.to_thread(check_file, file=file, source=source, expected_frames=expected_frames))
+    # tasks = [asyncio.to_thread(check_file, file=file, source=source, expected_frames=expected_frames) for file in fileList]
+    results += await asyncio.gather(*tasks)
     corrupted = list(filter(lambda x: any(['corrupted' in x.status, 'incomplete' in x.status]), results))
     if action == 'move':
         move_corrupted_or_incomplete_files(source,corrupted)

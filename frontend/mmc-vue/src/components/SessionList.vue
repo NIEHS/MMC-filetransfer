@@ -1,6 +1,6 @@
 <template>
     <div class="col-12 row align-items-center">
-    <h2 class="col-auto">Sessions</h2>
+        <h2 class="col-auto">Sessions</h2>
         <div class="col-3">
             <div class="input-group">
                 <input class="form-control border" type="search" v-model="fetchArguments.session" v-on:keyup="updateSessions()">
@@ -14,12 +14,14 @@
     <!-- <label class="col-auto px-0"><BIconSearch></BIconSearch></label><span class="col-3 p-0"><input class="form-control" v-model="fetchArguments.session" v-on:keyup="updateSessions()"></span> -->
     </div>
     <div>
-    <div  v-for="session in sessions" :key="session" class="dropdown col-auto">
+    <div class="row">
+    <div  v-for="session in sessions" :key="session" class="dropdown col-auto p-0">
             <button class="badge rounded-pill bg-primary" type="button" data-bs-toggle="dropdown" aria-expanded="false">{{session}}</button>
             <div class="dropdown-menu p-2 bg-secondary" style="width: 20vw">
                 <SessionDetail :session="session"></SessionDetail>
                 </div>
             </div>
+    </div>
     </div>
     
 </template>

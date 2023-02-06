@@ -9,6 +9,7 @@ export default function (url, data) {
         headers: {
             'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(data)
     }
     const state = reactive({

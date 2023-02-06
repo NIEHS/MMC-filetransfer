@@ -1,16 +1,30 @@
 from pathlib import Path
+from datetime import datetime, timedelta
+
 from typing import List
-from fastapi import FastAPI, status, Response, BackgroundTasks
-from MMC.lib.groups import Group, save_groups
-from MMC.lib.session import Session, load_session_from_file, save_session, find_session_directory, filter_sessions
-from MMC import settings
 import logging
 
-from MMC.preprocess.session import preprocess, run_transfer
+from fastapi import FastAPI, Request, status, Response, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
+from fastapi.security import OAuth2PasswordRequestForm
+
+from MMC import settings
+
+import auth
+import groups
+import sessions
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+app.include_router(groups.groups)
+app.include_router(sessions.sessions)
+app.add_exception_handler(auth.NotAuthenticatedException,auth.not_authenticated_exception_handler)
+
+templates = Jinja2Templates(directory="templates")
 origins = [
     "http://localhost",
     "http://localhost:8080",
@@ -25,70 +39,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-logger = logging.getLogger(__name__)
 
-@app.get('/groups/list/')
-async def display_group_info():
-    return settings.groups
-
-@app.post('/groups/add', status_code=status.HTTP_201_CREATED, )
-async def add_group(group:Group,response:Response):
-    if group.name in settings.groups:
-        logger.info(f'Group {group.name} already exists')
-        response.status_code = status.HTTP_208_ALREADY_REPORTED
-        return settings.groups[group.name]
-    settings.groups[group.name] = group
-    save_groups(settings.groups, settings.groups_file)
-    return settings.groups
-
-@app.patch('/groups/update')
-async def update_group(group:Group,response:Response):
-    settings.groups[group.name] = group
-    groups = save_groups(settings.groups, settings.groups_file)
-    logger.info(f'Updated group {group}')
-    logger.info(f'{groups}')
-    return groups
-
-@app.get('/sessions/find/')
-async def find_sessions(group:str='*',project:str='*',session:str='*'):
-    sessions = filter_sessions(group,project,session)
-    return [session.name for session in sessions]
-
-# @app.get('/sessions/find/{pattern}')
-# async def find_sessions(pattern:str='*'):
-#     sessions = search_sessions(pattern)
-#     return [session.name for session in sessions]
-
-@app.post('/session/setup/')
-async def session_setup(session:Session, status_code=status.HTTP_201_CREATED):
-    save_session(session)
-    response= dict(session=session.session, 
-    commands=['ssh mri20-dtn01',
-    'conda activate /datastaging/conda_env/MMC', 
-    f'mmc.py session transfer {session.session} --duration 16',
-    f'mmc.py session preprocess {session.session} --duration 16'])
-    return response
-
-@app.get('/session/{sessionName}')
-async def session_get(sessionName:str):
-    _, session = load_session_from_file(sessionName)
-    return session
-
-@app.post('/session/{sessionName}/start')
-async def session_start(background_tasks: BackgroundTasks, sessionName:str,duration:int=16,remove:bool=False):
-    background_tasks.add_task(run_transfer, sessionName,duration,remove=remove)
-    return {"message": f"{sessionName} started", 'session': sessionName }
-
-
-@app.get('/session/{sessionName}/log')
-async def session_log(sessionName:str, lineNumber:int=200) -> List[str]:
-    sessionPath = find_session_directory(sessionName)
-    return {'log':Path(sessionPath / 'session.log').read_text().split('\n')[-lineNumber:]}
-
-@app.get('/session/{sessionName}/preprocess')
-async def session_preprocess(background_tasks: BackgroundTasks,sessionName:str, scipion:bool=True, duration:int=16):
-    background_tasks.add_task(preprocess, sessionName, scipion=scipion, duration=duration)
-    return {"message": f"{sessionName} precessing started", 'session': sessionName }
+@app.get("/", response_class=HTMLResponse,)
+async def home(request: Request, current_user: auth.User = Depends(auth.get_current_active_user)):
+    return templates.TemplateResponse("home.html", {"request": request})
 
 @app.get('/scopes/', response_model=List[str])
 async def list_scopes() -> List[str]:
@@ -103,4 +57,50 @@ async def list_path(value:str):
         return root.glob(remainder)
 
 
+@app.post("/token", response_model=auth.Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = auth.authenticate_user(auth.fake_users_db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
+
+@app.get("/users/me/", response_model=auth.User)
+async def read_users_me(current_user: auth.User = Depends(auth.get_current_active_user)):
+    return current_user
+
+@app.get("/login", response_class=HTMLResponse)
+async def login(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post('/login')
+async def login_submit(form_data: auth.OAuth2PasswordRequestFormData):
+    logger.debug(form_data)
+    token = await login_for_access_token(form_data)
+    logger.debug(token)
+    # header= {
+    #     "Authorization": f"{token['token_type']} {token['access_token']}",
+    # }
+    # response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    # response = Response()
+    # response.set_cookie(
+    #         "Authorization",
+    #         value=f"Bearer {token['access_token']}",
+    #         domain="mri20-dtn01",
+    #         httponly=True,
+    #         max_age=1800,
+    #         expires=1800,
+    #     )
+    return f"Bearer {token['access_token']}"
+
+
+
+    

@@ -12,7 +12,8 @@
     "bootstrap-icons-vue": "^1.8.1",
     "core-js": "^3.8.3",
     "vue": "^3.2.13",
-    "vue-axios": "^3.5.1"
+    "vue-axios": "^3.5.1",
+    "vue-cookies": "^1.8.2"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",

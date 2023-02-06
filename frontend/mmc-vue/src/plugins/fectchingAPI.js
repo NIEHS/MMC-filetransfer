@@ -10,8 +10,10 @@ export default function (url) {
     })
     const fetchData = async (filters = '') => {
         try {
-            let resp = await fetch(API_ROOT + url + filters)
-            state.response = await resp.json()
+            let resp = await fetch(API_ROOT + url + filters, {
+                credentials: 'include'
+            })
+            state.response = await resp.json(), 
             console.log(resp)
         }
         catch (errors) {
