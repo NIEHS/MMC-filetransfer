@@ -4,8 +4,10 @@ import sys
 import MMC.cli.cli as cli
 import importlib
 import asyncio
+import os
 
 logger = logging.getLogger(__name__)
+os.umask(int('002'))
 
 
 if __name__ == "__main__":

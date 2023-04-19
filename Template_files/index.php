@@ -1,26 +1,31 @@
 <head></head>
 <body class="page_bg">
 <?php
-// Read directory, spit out links
-$relpath = str_replace("/data/html","",realpath('.'));
-$username = str_replace("/data/html/reports/","",realpath('.'));
-echo $username." reports listing <br>";
-if ($handle = opendir('./reports')) {
-    while (false !== ($entry = readdir($handle))) {
-        if ($entry != "." && $entry != "..") {
-            echo '<a href="'.$relpath.'/reports/'.$entry.'/index.html">'.$entry.'</a><br>';
+$relpath = explode('/',realpath('.'));
+$username = end($relpath);
+echo '<h1>'.$username.' reports listing</h1>' ;
+$dir = opendir('./reports');
+$sessions = array();
+while ($sessions[] = readdir($dir));
+closedir($dir);
+sort($sessions);
+foreach ($sessions as $session)
+    if ($session!= "." && $session != ".." && $session != "") {
+        echo '<div class="line"><h3 class="header">'.$session.':</h3> <a target="_blank" href="reports/'.$session.'/index.html">All</a> <a target="_blank" href="reports_good/'.$session.'/index.html">Good only</a></div>';
         }
-    }
-    closedir($handle);
-}
-if ($handle = opendir('./Scipion')) {
-    while (false !== ($entry = readdir($handle))) {
-        if ($entry != "." && $entry != "..") {
-            echo '<a href="'.$relpath.'/reports/'.$entry.'/index.html">'.$entry.'</a><br>';
-        }
-    }
-    closedir($handle);
-}
 ?>
 </body>
 </html>
+
+<style>
+    .line {
+        display: flex;
+        width: 40vw;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .header {
+        margin: 0.5rem;
+    }
+
+</style>

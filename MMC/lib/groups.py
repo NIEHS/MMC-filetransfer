@@ -2,6 +2,7 @@ import logging
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import yaml
+from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class Project(BaseModel):
 class Group(BaseModel):
     name: str
     affiliation: str
-    projects: List[Project]
+    projects: List[Project] = Field(default_factory=list)
 
     def add_project(self, name:str, emailList:List[str]):
         if name in list(map(lambda x : x.name, self.projects)):
@@ -58,7 +59,7 @@ def load_groups(groups_file) -> dict:
     for group in groups:
         group = Group.parse_obj(group)
         output_groups[group.name] = group
-    return output_groups
+    return OrderedDict(sorted(output_groups.items()))
 
 def save_groups(groups, groups_file):
     export_groups = []
@@ -66,6 +67,7 @@ def save_groups(groups, groups_file):
         export_groups.append(group.dict())
     with open(groups_file, 'w') as f:
         f.write(yaml.dump(export_groups))
+    return groups
 
 
 

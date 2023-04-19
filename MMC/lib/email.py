@@ -8,7 +8,7 @@ from email.mime.text import MIMEText
 def load_contacts(file: Path = settings.email_contactList) -> List[str]:
     with open(file) as f:
         lines = f.readlines()
-    return [line.strip() for line in lines]
+    return [line.strip() for line in lines if line[0] != '#']
     
 
 def send_email(title,message,html=None, contacts:List[str]=[]):

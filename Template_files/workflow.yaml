@@ -1,0 +1,41 @@
+import:
+    filesPath: -1
+    filesPattern: "*.tif"
+    voltage: -1
+    sphericalAberration: -1
+    magnification: -1
+    samplingRate: -1
+    dosePerFrame: -1
+    gainFile: -1
+    timeout: -1
+motioncor:
+    gpuList: "{{GPU 1,2}}"
+    binFactor: 1.0
+    numberOfThreads: 3
+micassess:
+    gpuList: "{{GPU 3}}"
+cryolo:
+    boxSize: "{{PARTICLE_SIZE 1}}"
+    gpuList: "{{GPU 1}}"
+extract:
+    downFactor: 4.0
+    boxSize: "{{PARTICLE_SIZE 0.375}}"
+trigger:
+    outputSize: -1
+relionBlobPicker:
+    boxSize: "{{PARTICLE_SIZE 1.5}}"
+    minDiameter: "{{PARTICLE_SIZE 0.9,val.import.samplingRate}}"
+    maxDiameter: "{{PARTICLE_SIZE 1.1,val.import.samplingRate}}"
+    threshold: -0.3
+consensus:
+    consensusRadius: "{{PARTICLE_SIZE 0.3}}"
+2D:
+    maskDiameterA: "{{PARTICLE_SIZE 1.2,val.import.samplingRate}}"
+    gpusToUse: "{{GPU 4}}"
+monitor:
+    publishCmd: -1
+    monitorTime: 30000.0
+monitorGood:
+    publishCmd: -1
+    monitorTime: 30000.0    
+

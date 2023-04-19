@@ -20,11 +20,12 @@ def is_nfs_available(path:Path):
     signal.alarm(5)
     result = False
     try:
-        path.iterdir()
+        sub.run(shlex.split(f'ls {str(path)}'))
         logger.info(f'NFS {path} is available')
         result = True
-    except Exception as e: 
-        logging.exception(e)
+    except Exception as e:
+        pass
+        # logging.exception(e)
     finally:
         signal.alarm(0)
     return result
@@ -87,7 +88,6 @@ class NSFStorageLocation(LocalStorageLocation):
         if is_nfs_available(newDir.parent):
             newDir.mkdir(exist_ok=True,parents=True)
         return newDir
-
 
 class RemoteStorageLocation(StorageLocation):
 

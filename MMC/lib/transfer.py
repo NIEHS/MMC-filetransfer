@@ -72,7 +72,17 @@ class Transfer:
         self.filesPattern = self.set_filesPatterns(filesPattern)
         self.gainReference = self.set_gainReference(gainReference)
 
+    @property
+    def total_files(self):
+        return len(self.transfer_list)
 
+    @property
+    def total_corrupted_files(self):
+        return len(self.corrupted_files)
+
+    @property
+    def corrupted_files(self):
+        return list(filter(lambda x: any(['corrupted' in x.status, 'incomplete' in x.status]), self.transfer_list))
 
     def set_filesPatterns(self, filesPattern=None):
         if filesPattern is None:
@@ -86,7 +96,7 @@ class Transfer:
 
 
     def load(self):
-        print('loading')
+        # print('loading')
         with open(self.logfile, 'r') as file:
             lines = file.read().splitlines()
         for f in lines:
@@ -101,38 +111,46 @@ class Transfer:
                 status = ','.join(f.status)
                 file.write(f'{str(f.path)}\t{status}\t{f.timestamp}\t{f.delete}\n')
 
-    def list_source(self, minfiletime=60, filesPattern=None):
+    def list_source(self, minfiletime=60, checkSizeTime=1200, filesPattern=None):
         files = []
         new_files = False
         files_done = [p.path.name for p in self.transfer_list]
         patterns = self.filesPattern
         for pattern in patterns:
-            files +=  self.source.glob(pattern)
+            logger.debug(f'Loooking for files at {str(self.source)}/{pattern}')
+            files +=  list(self.source.glob(pattern))
         for f in files:
-            if f.name not in files_done and time.time() - f.stat().st_ctime > minfiletime:
-                #Check if file is still being written if not there for 20+ minute
-                if f.stat().st_ctime < 1200:
-                    init_size = f.stat().st_size
-                    time.sleep(0.2)
-                    if init_size != f.stat().st_size:
-                        continue
-                m = Movie(path=f)
-                m.delete = self.delete
-                self.transfer_list.append(m)
-                del m
-                new_files = True
+            filetime = time.time() - f.stat().st_ctime
+            if f.name in files_done or filetime < minfiletime:
+                continue
+            #Check if file is still being written if not there for 20+ minute
+            if filetime < checkSizeTime:
+                logger.debug(f'Checking if {f} is fully written.')
+                init_size = f.stat().st_size
+                time.sleep(1)
+                if init_size != f.stat().st_size:
+                    logger.debug(f'{f} is was not fully written. Skipping for now.')
+                    continue
+            m = Movie(path=f)
+            m.delete = self.delete
+            self.transfer_list.append(m)
+            del m
+            new_files = True
         self.transfer_list.sort(key=lambda x: x.timestamp)
         return new_files
 
-    def get_subset(self,label:List,pool=5):
+    def get_subset(self,label:List,pool=5,no_meta=False):
         chunk_size=0
         subset=[]
         for f in self.transfer_list:
             if chunk_size == pool:
                 break
-            if not set(label).issubset(f.status):
+            if set(label+['corrupted','incomplete']).isdisjoint(f.status):
+            # if not set(label).issubset(f.status):
                 if f.path.suffix in ['.mdoc', '.tiff']:
                     chunk_size += 1
+                if f.path.suffix == '.mdoc' and no_meta:
+                    continue
                 subset.append(f)
         return subset
 
@@ -179,7 +197,6 @@ def rsync(fileList:List[Movie], destination:Path, label:str):
     pattern2 = re.compile(r'^([\w\.]+) is uptodate\n$') 
     while True:
         line= rsync_process.stdout.readline().decode()
-        # print(line)
         if rsync_process.poll() is not None and not line:
             logger.info('rsync transfer finished')
             break
@@ -187,7 +204,6 @@ def rsync(fileList:List[Movie], destination:Path, label:str):
             time.sleep(0.5)
             continue
         finds = re.findall(pattern, line) + re.findall(pattern2, line)
-        # print('Find!',finds)
         for mic in finds:
             mic = next((x for x in fileList if x.path.name == mic and label not in x.status), None)
             if mic is not None:
@@ -204,7 +220,7 @@ def copy(f, destination, label):
         new_loc = shutil.copy2(file, destination)
         logger.info(f'Copied {f.path.name}')
     except:
-        logger.info(f'Could not locate file at {file}. ',end="")
+        logger.info(f'Could not locate file at {file}. ')
         new_loc = os.path.join(destination,f.path.name)
         if os.path.isfile(new_loc):
             logger.info('Found at destination')
@@ -221,11 +237,11 @@ def remove_from_source(files_list, delete_status: list = ['staging']):
             deleted= False
             while not deleted: 
                 try:
-                    Path(f.path).unlink()
+                    Path(f.path.name).unlink()
                     deleted = True
                     f.status.append('deleted')
                 except Exception as e:
-                    logger.debug(f'Error removing {f.path}, {e}, trying again in 2 seconds')
+                    logger.debug(f'Error removing {f.path.name}, {e}, trying again in 2 seconds')
                     time.sleep(2)
     
     return files_list
@@ -239,6 +255,53 @@ async def async_transfer_local(fileList:List[Movie], destination:Path, label:str
     tasks = [asyncio.to_thread(copy, f,destination,label=[label])for f in fileList]
     return await asyncio.gather(*tasks)
 
+def check_file(file: Movie, source:Path, expected_frames:int) -> Movie:
+    command = f"header {str(source/ file.path.name)}"
+    command = sub.run(shlex.split(command),stdout=sub.PIPE, stderr=sub.PIPE)
+    output = command.stdout.decode()
 
+    pattern = re.compile(r'Start\scols,.*\d+\s+\d+\s+(\d+)\n')
+    if 'ERROR:' in output:
+        logger.info(f'File: {file} is corrupted')
+        file.status.append('corrupted')
+        return file
+    m = re.search(pattern,output)
+    result = m.group(1) if m else 0
+    # logger.debug(f'Frames= {result} in {file}')
+    if int(result) != expected_frames:
+        logger.info(f'File: {file} is incomplete')
+        file.status.append('incomplete')
+        return file
 
+    file.status.append('checkOK')
+    return file
 
+def move_corrupted_or_incomplete_files(location:Path,corrupted:List):
+    directory = location / 'corrupted'
+    directory.mkdir(exist_ok=True)
+    for file in corrupted:
+        srcFile = location/file.path.name
+        if Path(directory,file.path.name).exists():
+            logger.debug(f'{file.path.name} already in {directory}')
+            continue
+        if srcFile.exists():
+            logger.debug(f'Moving {file.path.name} to {directory}')
+            shutil.move(srcFile, directory)
+            continue
+
+        logger.debug(f'Corrupted file not found')
+
+async def check_files(fileList:List,source:Path, expected_frames:int,action='move'):
+    results = []
+    tasks = []
+    for file in fileList:
+        if any(['.mdoc' in file.path.name,'Ref' in file.path.name,'gain' in file.path.name, 'checkOK' in file.status, 'corrupted' in file.status, 'incomplete' in file.status]):
+            results.append(file)
+            continue
+        tasks.append(asyncio.to_thread(check_file, file=file, source=source, expected_frames=expected_frames))
+    # tasks = [asyncio.to_thread(check_file, file=file, source=source, expected_frames=expected_frames) for file in fileList]
+    results += await asyncio.gather(*tasks)
+    corrupted = list(filter(lambda x: any(['corrupted' in x.status, 'incomplete' in x.status]), results))
+    if action == 'move':
+        move_corrupted_or_incomplete_files(source,corrupted)
+    return results

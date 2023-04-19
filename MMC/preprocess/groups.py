@@ -1,7 +1,8 @@
 import logging
 from MMC import settings
 from MMC.lib.groups import Group, ProjectDoesNotExistError, save_groups
-from typing import Optional, List
+
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,13 @@ def display_group_info(name:str='__all__'):
     if name == '__all__':
         for _, group in settings.groups.items():
             print(group.print_self())
-        return
+        return settings.groups
     print(settings.groups[name].print_self())
+    return settings.groups[name]
+
+
+    
+
 
 
     

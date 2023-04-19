@@ -95,12 +95,21 @@ session:
       - name: detectorCounts
         type: float
         help: Counts on the detector over vaccum (empty area) in e/pix/s for the Acquisition mag.
+      - name: defocusMin
+        type: float
+        help: Minimum defocus used for the collection.
+      - name: defocusMax
+        type: float
+        help: Maximum defocus used for the collection.
+      - name: slitWidth
+        type: float
+        default: 0
+        help: Slit width used for the energy filter if applicable (default:0 which is equivalent to None).
       - name: mode
         type: str
         help: Data collection mode
         default: spr
         choices: [spr, tomo]
-        help: Whether it is a single-particle or SPR data collection
       - name: tiltAngleOrScheme
         default: '0'
         type: str
@@ -114,6 +123,10 @@ session:
       - name: date
         type: str
         help: Override the collection date. YYYYMMDD
+      - name: gainCorrected
+        help: Add this argument if the data is already gain corrected.
+        action: store_true
+        default: False
   transfer:
     help: Starts file transfer to staging and long-term storage
     splitArgs: True
@@ -129,12 +142,26 @@ session:
         type: float
         help: Expected duration or remaining duration of the file transfer in hours. The transfer will automatically terminate after that time.
         default: 16
+      - name: noStaging
+        help: Add this argument to disable moving files to staging area
+        action: store_true
+      - name: noLongTerm
+        help: Add this argument to disable moving files to longTerm area
+        action: store_true
       - name: cluster
         help: Add this argument to move files to the cluster.
         action: store_true
       - name: remove
         help: Add this argument to remove the files from the source directory after transfer.
         action: store_true
+      - name: checkFiles
+        help: Check for file corruption and completeness after transfer to staging area.
+        action: store_true
+      - name: emailLevel
+        type: str
+        help: Controls the type of emails that are sent
+        choices: ['all','none']
+        default: all
   preprocess:
     help: Start the preprocessing
     splitArgs: True
@@ -153,7 +180,103 @@ session:
       - name: scipion
         help: Will start scipion preprocessing
         action: store_true
-        default: True  
+        default: True
+  new_preprocess:
+    help: Start the preprocessing in gn030701
+    splitArgs: True
+    package: MMC.preprocess.session
+    method: new_preprocess
+    async: True
+    args:
+      - name: session
+        type: str
+        help: Name of the session under the YYYYMMDD_sessionName format.
+        required: True
+      - name: particleSize
+        help: Particle size in pixels
+        type: int
+        required: True
+      - name: duration
+        default: 16
+        type: int
+        help: Expected duration or remaining duration of the preprocessing in hours.
+      - name: trigger2D
+        type: int
+        default: 30_000
+        help: Number of particles required to initiate 2D classification
+      - name: movieBin
+        type: float
+        default: 1.0
+        help: Binning factor to use when running motionCor2. The resulting micrographs will be binned by this factor.
+      - name: gpus
+        help: which GPUs to use for preprocessing
+        default: ["0","1","2","3"]
+        type: str
+        nargs: 4
+  checkFiles:
+    help: Scan the files for potentially corrupted files and moves hits to a seperate sub-directory
+    package: MMC.preprocess.session
+    method: checkFiles
+    async: True
+    args:
+      - name: session
+        type: str
+        help: Name of the session under the YYYYMMDD_sessionName format.
+        required: True
+      - name: directory
+        type: str
+        help: Which storage location should the scan be run. Default is staging.
+        choices: [staging, longTerm]
+        default: staging
+      - name: force
+        help: Whether to rerun the scan on already scanned files
+        action: store_true
+        default: False
+  list:
+    help: List existing sessions in a given group, project and/or partial session name.
+    package: MMC.cli.commands
+    splitArgs: True
+    method: find_sessions
+    args:
+      - name: group
+        type: str
+        help: 'Name of the group to look into'
+        default: '*'
+      - name: project
+        type: str
+        help: 'Name of the project to look into'
+        default: '*'
+      - name: session
+        type: str
+        help: Complete or partial name of the session. If partial, it will search for any session containing the specified string of caracters
+        default: '*'
+      - name: details
+        action: store_true
+        default: False
+        help: This option will print all the information about the session instead of only the name
+  export:
+    help: Export sessions filtered by a given group, project and/or partial session name.
+    package: MMC.cli.commands
+    splitArgs: True
+    method: export
+    args:
+      - name: output
+        type: str
+        help: path to the output file. Must end .csv (More formats at some point)
+        required: True
+      - name: group
+        type: str
+        help: 'Name of the group to look into'
+        default: '*'
+      - name: project
+        type: str
+        help: 'Name of the project to look into'
+        default: '*'
+      - name: session
+        type: str
+        help: Complete or partial name of the session. If partial, it will search for any session containing the specified string of caracters
+        default: '*'
 
 
+        
 

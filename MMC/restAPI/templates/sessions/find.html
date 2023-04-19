@@ -1,0 +1,22 @@
+<div class="col-12 row align-items-center">
+    <h2 class="col-auto">Sessions</h2>
+        <div class="col-3">
+            <div class="input-group">
+                <input class="form-control border" hx-target="#sessions" hx-trigger="keyup changed delay:500ms" hx-get="/sessions/find/" type="search">
+                    <button class="btn btn-outline-secondary bg-white border border-start-0" style="margin-left: -38px !important: z-index: 1" type="button">
+                        <i class="bi bi-search"></i>
+                    </button>
+            </div>
+        </div>
+    </div>
+    <div>
+    {% for session in sessions %}    
+    <div  class="dropdown col-auto">
+        <button class="badge rounded-pill bg-primary" type="button" data-bs-toggle="dropdown" aria-expanded="false">{{session}}</button>
+        <div class="dropdown-menu p-2 bg-secondary" style="width: 20vw">
+            ADD LOGIC HERE
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
