@@ -1,15 +1,17 @@
 from copy import copy
-import shutil
+from typing import List
 import time
+import traceback
+import logging
+from pathlib import Path
 from MMC.lib.email import send_email
 from MMC.lib.logger_settings import add_log_handlers
 from MMC.lib.transfer import Movie, Transfer, check_files, remove_from_source, update_source
 from MMC.lib.session import save_session, load_session_from_file, Session
-from MMC.lib.scipion_workflow import scipion_template
-from pathlib import Path
+from MMC.lib.scipion_workflow import scipion_template, new_scipion_template
+
 from MMC import settings
-import traceback
-import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -223,3 +225,55 @@ async def checkFiles(session:str, directory:str, force:bool=False, action:str='m
     session.corrupted = transfer_obj.total_corrupted_files
     logger.info(f'Found {session.corrupted} corrupted or incomplete files.')
     save_session(session)
+
+async def new_preprocess(session: str, scipion:bool=True, duration:float=16, movieBin:float=1.0, particleSize:int|None=None, gpus:List=[0,1,2,3], trigger2D=30_000):
+    
+    file, session = load_session_from_file(session)
+
+    if scipion:
+        storage_location = settings.storageLocations['new_scipion']
+        logger.info('Creating scipion workflow')
+        html_destination = settings.env.HTML / session.group / 'reports'
+        html_good_destination = settings.env.HTML / session.group / 'reports_good'
+        phpFile = html_destination.parent / 'index.php'
+        settings.storageLocations['staging'].mkdir(phpFile.parent)
+        await settings.storageLocations['staging'].transfer([Movie(Path(settings.env.template_files,'index.php'))], phpFile)
+        raw_path = settings.storageLocations['niehs_cluster'].set_session_path(session.specific_path) / 'raw'
+        workflow = new_scipion_template()
+
+        workflow.set_values([
+                ('import', 'filesPath', str(raw_path)),
+                ('import', 'timeout', 240*60),
+                ('import', 'gainFile', session.get_gain_file(raw_path)),
+                ('monitor', 'monitorTime', int(duration * 60)),
+                ('monitor', 'publishCmd', f'rsync -aL %(REPORT_FOLDER)s mri20-dtn01:{html_destination}'),
+                ('monitorGood', 'monitorTime', int(duration * 60)),
+                ('monitorGood', 'publishCmd', f'rsync -aL %(REPORT_FOLDER)s mri20-dtn01:{html_good_destination}'),
+                ('import', 'dosePerFrame', session.totalDose/ session.frameNumber),
+                ('import', 'samplingRate', session.pixelSize),
+                ('import', 'magnification', session.magnification),
+                ('trigger', 'outputSize', trigger2D),
+                ('motioncor','binFactor', movieBin)
+            ])
+        workflow.set_scope_defaults(settings.scopes[session.scope])
+        workflow.set_particle_size(particleSize)
+        workflow.set_gpu_ids(gpus_list=gpus)
+        if not workflow.check_completion():
+            return 
+        workflow.update_full_template()
+        wf = workflow.save_template(file.parent/'scipion_workflow.json')
+        scipion_session_directory = storage_location.mkdir(session.specific_path)
+        await settings.storageLocations['longTerm'].transfer([Movie(wf)],scipion_session_directory)
+        logger.info('All arguments for scipion processing present.\nCreating Scipion project. Scheduling will occur after the gain is transfered.')
+        command = f"""{'/ddn/gs1/project/cryoemCore/autoprocess/Scipion/ScipionUserData/scipion.sh'} python -m pyworkflow.project.scripts.create "{session.session}" "{scipion_session_directory/ wf.name}" "{str(scipion_session_directory.parent)}" """
+        storage_location.sub_run(command)
+        time.sleep(5)
+        while True:
+            _, session = load_session_from_file(session.session)
+            if len(list(raw_path.glob('gain*'))) > 0 or session.gainCorrected:
+                logger.info('All of scipion requirements are satisfied. Starting preprocessing.')
+                command = f"{'/ddn/gs1/project/cryoemCore/autoprocess/Scipion/ScipionUserData/scipion.sh'} python -m pyworkflow.project.scripts.schedule {session.session}"
+                p = storage_location.sub_Popen(command)   
+                return
+            logger.info('Waiting 2 min for gain file to be transfered.')
+            time.sleep(120)

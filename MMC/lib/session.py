@@ -33,6 +33,9 @@ class Session(BaseModel):
     totalDose: float
     frameNumber: int
     detectorCounts: float
+    defocusMin: float = 0
+    defocusMax: float = 0
+    slitWidth: int | None = None
 
     mode: str = 'spr'
     tiltAngleOrScheme: str = '0'
@@ -147,6 +150,7 @@ class Session(BaseModel):
             return v
         else:
             raise GroupDoesNotExistError()
+        
     @validator('date')
     def remove_date_hypens(cls,v, values):
         return v.replace('-','')
@@ -160,6 +164,12 @@ class Session(BaseModel):
     @validator('gainReference')
     def is_gain_empty(cls,v, values):
         if v == '':
+            v= None
+        return v 
+    
+    @validator('slitWidth')
+    def is_slit_width_null(cls,v, values):
+        if v == 0:
             v= None
         return v 
 
@@ -182,6 +192,8 @@ class Session(BaseModel):
                         'Voltage': f"{settings.scopes[self.scope]['voltage']} keV",
                         'Spherical Abberation': f"{settings.scopes[self.scope]['sphericalAberration']} nm",
                         'Tilt angle/scheme': self.tiltAngleOrScheme,
+                        'Defocus Range': f"{self.defocusMin} to {self.defocusMax} um",
+                        'Slit Width': f"{self.slitWidth} eV"
                     },
                     'Statistics': {
                         'Number of movies': self.numberOfMovies,

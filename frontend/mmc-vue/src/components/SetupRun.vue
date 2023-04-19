@@ -57,7 +57,7 @@
                     <label>{{field.label}}</label>
                     <input :type="field.type" step="0.01" class="form-control" id="setupSourceDir" v-model="field.value">
                 </div>
-                <div class='col-4' v-for="field in [session.magnification,session.totalDose,session.detectorCounts,session.frameNumber,session.tiltAngleOrScheme]" :key="field.label">
+                <div class='col-4' v-for="field in [session.magnification,session.totalDose,session.detectorCounts,session.frameNumber,session.tiltAngleOrScheme,session.defocusMin,session.defocusMax,session.slitWidth]" :key="field.label">
                     <label>{{field.label}}</label>
                     <input :type="field.type" class="form-control" id="setupSourceDir" v-model="field.value">
                 </div>
@@ -155,6 +155,21 @@ export default {
                 type: 'number',
                 value: 0,
                 label: 'Detector Counts'
+            },
+            defocusMin: {
+                type: 'number',
+                value: 0,
+                label: 'Min Defocus'
+            },
+            defocusMax: {
+                type: 'number',
+                value: 0,
+                label: 'Max Defocus'
+            },            
+            slitWidth: {
+                type: 'number',
+                value: 0,
+                label: 'Energy Filter Slit Width'
             },
 
             tiltAngleOrScheme: {

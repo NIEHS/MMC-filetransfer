@@ -89,7 +89,6 @@ class NSFStorageLocation(LocalStorageLocation):
             newDir.mkdir(exist_ok=True,parents=True)
         return newDir
 
-
 class RemoteStorageLocation(StorageLocation):
 
     SSHstring:str
