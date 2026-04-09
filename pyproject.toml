@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "MMC"
+version = "0.2"
+description = "Filetransfer/auto-process initiating script"
+authors = [
+    { name = "Jonathan Bouvette", email = "jonathan.bouvette@nih.gov" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "pyyaml",
+    "fastapi",
+    "uvicorn[standard]",
+    "PyJWT",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.22",
+    "globus-sdk>=4.4.1",
+]
+
+[project.scripts]
+mmc = "MMC.bin.mmc:main"
+mmc-api = "MMC.restAPI.main:start"
+
+[tool.setuptools]
+packages = ["MMC"]

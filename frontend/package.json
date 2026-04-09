@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "serve": "npm run serve --prefix mmc-vue",
+    "build": "npm run build --prefix mmc-vue",
+    "preview": "npm run preview --prefix mmc-vue"
+  },
   "dependencies": {
     "bootstrap": "^5.2.2"
   }

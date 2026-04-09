@@ -1,11 +1,8 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import VueCookies from 'vue-cookies';
+import VueCookies from 'vue-cookies'
 import 'bootstrap'
 
-
-var app = createApp(App)
-
-
-app.mount('#app')
+const app = createApp(App)
 app.use(VueCookies)
+app.mount('#app')

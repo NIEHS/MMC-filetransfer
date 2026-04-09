@@ -1,90 +1,87 @@
 import logging
 import logging.config
+import yaml
 from MMC.cli.cli import load_commands
 from MMC.lib.config import project_path, config_path, Settings
-from MMC.lib.groups import load_groups
+from MMC.lib.groups import load_groups, load_affiliations
 from MMC.lib.storage import load_storageLocations
 import sys
 
 
-env = Settings()
+# Commands are loaded eagerly — they only require cli.yaml, not .env
+commands = load_commands(project_path / 'MMC' / 'cli' / 'cli.yaml')
 
-LOG = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'generic': {
-            'format': '%(asctime)s [%(name)s:%(lineno)s - %(levelname)8s]   %(message)s',
-            'datefmt': '%Y-%m-%d %H:%M:%S',
+# Everything below requires a configured .env file
+try:
+    env = Settings()
+except Exception as e:
+    env = None
+    _settings_error = e
+else:
+    _settings_error = None
+
+def _require_env():
+    if env is None:
+        raise RuntimeError(
+            f"MMC is not configured. Please create config/.env from the template.\n"
+            f"Original error: {_settings_error}"
+        ) from _settings_error
+
+if env is not None:
+    LOG = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'generic': {
+                'format': '%(asctime)s [%(name)s:%(lineno)s - %(levelname)8s]   %(message)s',
+                'datefmt': '%Y-%m-%d %H:%M:%S',
+            }
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'generic',
+                'stream': sys.stdout,
+            },
+        },
+        'loggers': {
+            'root': {
+                'level': env.log_level,
+                'handlers': ['console'],
+            },
         }
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+    }
+
+    if env.logs is not None:
+        LOG['handlers']['file'] = {
+            'class': 'logging.handlers.TimedRotatingFileHandler',
             'formatter': 'generic',
-            'stream': sys.stdout,
-        },
-    },
-    'loggers': {
-        'root': {
-            'level': env.log_level,
-            'handlers': ['console', ],
-        },
-    }
-}
+            'filename': str(env.logs / 'mmc.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 14,
+            'encoding': 'utf-8',
+        }
+        LOG['loggers']['root']['handlers'].append('file')
 
-if env.logs is not None:
-    LOG['handlers']['file'] = {
-        'class': 'logging.handlers.TimedRotatingFileHandler',
-        'formatter': 'generic',
-        'filename': str(env.logs / 'logs' /'mmc.log'),
-        'when': 'midnight',
-        'interval': 1,
-        'backupCount': 14,
-        'encoding': 'utf-8',
-    }
-    LOG['loggers']['root']['handlers'].append('file')
+    logging.config.dictConfig(LOG)
 
-logging.config.dictConfig(LOG)
+    groups_file = config_path / 'groups.yaml'
+    groups = load_groups(groups_file)
+    affiliations = load_affiliations(config_path / 'affiliations.yaml')
+    storageLocations = load_storageLocations(config_path / 'storageLocations.yaml')
+else:
+    groups = {}
+    affiliations = []
+    storageLocations = {}
 
-
-groups_file = config_path / 'groups.yaml'
-groups = load_groups(groups_file)
-commands = load_commands(project_path / 'MMC'/ 'cli' / 'cli.yaml')
-storageLocations= load_storageLocations(config_path/ 'storageLocations.yaml')
 email_contactList = config_path / 'contact_emails.txt'
-
 interface = None
 
+def _load_scopes(scopes_file):
+    if not scopes_file.exists():
+        return {}
+    with open(scopes_file) as f:
+        return yaml.safe_load(f) or {}
 
-niehs_arctica = {
-    "voltage": 200,
-    "sphericalAberration": 2.7,
-    "amplitudeContrast": 0.1,
-    "gainRot": 3,
-    "gainFlip": 2,
-    "filesPattern": "*.tif",
-    "gpuList": "0 1"
-}
-
-niehs_Krios_EPU = {
-    "voltage": 300,
-    "sphericalAberration": 2.7,
-    "amplitudeContrast": 0.1,
-    "gainRot": 0,
-    "gainFlip": 0,
-    "filesPattern": "*_fractions.tiff",
-    "gpuList": "2 3"
-}
-
-niehs_Krios = {
-    "voltage": 300,
-    "sphericalAberration": 2.7,
-    "amplitudeContrast": 0.1,
-    "gainRot": 0,
-    "gainFlip": 0,
-    "filesPattern": "*.tif",
-    "gpuList": "2 3"
-}
-
-scopes = {'niehs_arctica': niehs_arctica, 'niehs_krios_epu': niehs_Krios_EPU, 'niehs_krios': niehs_Krios}
+scopes = _load_scopes(config_path / 'scopes.yaml')

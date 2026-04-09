@@ -16,7 +16,7 @@ from MMC import settings
 logger = logging.getLogger(__name__)
 
 def initiate_session(session: Session):
-    session= Session.parse_obj({k:v for k,v in session.items() if v is not None})
+    session = Session.model_validate({k: v for k, v in session.items() if v is not None})
     save_session(session)
 
 async def run_transfer(session:str, duration:float=16, cluster:bool=False, remove:bool=False, checkFiles:bool=False, noStaging:bool=False, noLongTerm:bool=False, emailLevel:str='all'):

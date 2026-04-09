@@ -9,6 +9,9 @@ logs = ''
 log_level = 'INFO'
 
 # Emails
-sender_email = ''
-smtp_server = ''
-smtp_port = 
+smtp_username = ''
+smtp_server = 'localhost'
+smtp_port = 25
+
+# REST API — list of allowed CORS origins (JSON array)
+cors_origins = '["http://localhost", "http://localhost:8080"]'

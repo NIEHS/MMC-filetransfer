@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from fastapi import Request, status, Response, Depends, APIRouter
 from fastapi.responses import HTMLResponse 
@@ -6,13 +7,17 @@ from fastapi.templating import Jinja2Templates
 
 from MMC.lib.groups import Group, save_groups
 from MMC import settings
-import auth
+from MMC.restAPI import auth
 
 logger = logging.getLogger(__name__)
 
 groups= APIRouter(dependencies=[Depends(auth.get_current_active_user)])
 
-templates = Jinja2Templates(directory="templates/groups/")
+templates = Jinja2Templates(directory=Path(__file__).parent / "templates" / "groups")
+
+@groups.get('/groups/affiliations/')
+async def list_affiliations():
+    return settings.affiliations
 
 @groups.get('/groups/view/list/', response_class=HTMLResponse)
 async def display_group_info(request: Request):

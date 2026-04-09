@@ -1,7 +1,5 @@
 import { reactive, toRefs } from "vue"
 
-const API_ROOT = 'http://mri20-dtn01:8000/'
-
 export default function (url, data) {
     console.log('PATCH.API',url, data)
     const content = {
@@ -20,7 +18,7 @@ export default function (url, data) {
     const patchData = async () => {
         try {
             console.log(content)
-            let resp = await fetch(API_ROOT + url, content)
+            let resp = await fetch(import.meta.env.VITE_API_ROOT + url, content)
             state.response = await resp.json()
             console.log(resp)
         }

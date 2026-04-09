@@ -4,8 +4,15 @@ import json
 import yaml
 from pathlib import Path
 from typing import Dict, List, Callable
-from pydantic.utils import deep_update
 import MMC.settings as settings
+
+def deep_update(base: dict, update: dict) -> dict:
+    for key, value in update.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            deep_update(base[key], value)
+        else:
+            base[key] = value
+    return base
 
 class scipion_template:
 

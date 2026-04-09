@@ -8,3 +8,4 @@ config/groups.yaml
 config/contact_emails.txt
 node_modules
 MMC/restAPI/help.txt
+globusconnectpersonal*

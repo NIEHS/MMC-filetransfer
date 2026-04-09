@@ -20,5 +20,5 @@ def send_email(title,message,html=None, contacts:List[str]=[]):
     text = mail.as_string()
     with smtplib.SMTP(settings.env.smtp_server, settings.env.smtp_port) as server:
         for receiver in set(load_contacts() + contacts):
-            server.sendmail(settings.env.sender_email, receiver, text)
+            server.sendmail(settings.env.smtp_username, receiver, text)
 

@@ -13,6 +13,8 @@ This new version also keeps track of data collection parameters and saves them a
 - New data collection session organization. Now organized into groups/project/session from groups/session. Extramural and external collaborators now have their dedicated storage areas.
 - Multiple files transfered concurrently instead of one after the other. This should result in faster transfer speeds.
 - Added extra check to ensure the files are fully written before being transfered.
+- REST API built with FastAPI to expose session and group management over HTTP
+- Vue 3 web frontend for managing groups, projects, and monitoring active transfer sessions
 
 ## Installation
 
@@ -21,17 +23,27 @@ Other dependencies:
 - [bbcp](https://www.slac.stanford.edu/~abh/bbcp/). Just download the executable for your architecture. Not needed if not running remote transfers.
 - [Scipion](https://scipion.i2pc.es/). Optional. Only if scipion preprocessing is going to be used.
 
-Create a new python 3.10 anaconda environment
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you don't have it already:
 ```
-conda create -n MMC python==3.10
-conda activate MMC
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Clone the repository and install.
+Clone the repository and install the MMC package:
 ```
 git clone https://github.com/NIEHS/MMC-filetransfer.git
 cd MMC-filetransfer
-pip install -e .
+uv sync
+```
+
+This creates a virtual environment in `.venv/` and installs all dependencies. The `mmc` command will be available via:
+```
+uv run mmc
+```
+
+Or activate the virtual environment to use `mmc` directly:
+```
+source .venv/bin/activate
+mmc
 ```
 
 ## Initial Setup
@@ -55,9 +67,12 @@ To get started, an enviroment files needs to be created. There is a template fil
     log_level = 'INFO' #Set the log_level to 'INFO' or 'DEBUG'
 
     # Emails
-    sender_email = '' #Who is sending the email notifications
-    smtp_server = '' #domain of the stmp server
-    smtp_port = #Port used by the server
+    smtp_username = '' #Sender address (must match the account configured in postfix/relay)
+    smtp_server = 'localhost' #SMTP server (use localhost to relay through postfix)
+    smtp_port = 25 #Port used by the server
+
+    # REST API
+    cors_origins = '["http://localhost", "http://localhost:8080"]' #JSON array of allowed frontend origins
 
     # Scipion
     HTML = ''  #Path to where the scipion static html reports should be placed
@@ -106,16 +121,21 @@ If `scipion` is set as `storage_type: remote`, an ssh key to that host will also
 ## Activating the environment
 
 ```shell
-$ conda activate MMC
-(MMC)$ 
+$ source .venv/bin/activate
+(.venv)$
+```
+
+Or prefix commands with `uv run` without activating:
+```shell
+$ uv run mmc
 ```
 
 ## Command-line interface basics
 
-The only executable for this package is `mmc.py`. To bring up the general help menu, do not use any argument.
+The only executable for this package is `mmc`. To bring up the general help menu, do not use any argument.
 
 ```shell
-$ mmc.py
+$ mmc
 Welcome to the MMC command line interface.
 
 Below is a list of available commands with their associated subcommands.
@@ -130,10 +150,10 @@ Below is a list of available commands with their associated subcommands.
        |-> transfer        (Starts file transfer to staging and long-term storage)
        |-> preprocess      (Start the preprocessing
 ```
-There are 2 main commands, groups and session and then sub-commands with a summary of the function. To learn more about a sub-command, you can bring up the help menu with `mmc.py mainCommand subCommand -h`:
+There are 2 main commands, groups and session and then sub-commands with a summary of the function. To learn more about a sub-command, you can bring up the help menu with `mmc mainCommand subCommand -h`:
 ```
 #Example
-$ mmc.py groups add -h
+$ mmc groups add -h
 usage: Add new group [-h] name {NIEHS,NICE,Collaborations}
 
 positional arguments:
@@ -158,7 +178,7 @@ To add a group, provide a name and an affiliation:
     - Collaborations: For external collaborators
 ```
 # Example
-$ mmc.py BorgniaM NIEHS
+$ mmc BorgniaM NIEHS
 {'name': 'BorgniaM', 'affiliation': 'NIEHS'}
 Adding name='BorgniaM' affiliation='NIEHS' projects=[]
 ```
@@ -171,7 +191,7 @@ To add a project into an existing group, the following will need to be provided:
 
 ```
 # Example
-$mmc.py groups add_project BorgniaM Project1 -emails student@univ.gov trainee@nih.gov
+$ mmc groups add_project BorgniaM Project1 -emails student@univ.gov trainee@nih.gov
 {'group': 'BorgniaM', 'name': 'Project1', 'emails': ['student@univ.gov', 'trainee@nih.gov']}
 ```
 
@@ -182,7 +202,7 @@ To add emails to an already existing project
 
 ```
 # Example
-$ mmc.py groups add_emails BorgniaM.Project1 -emails newTrainee@nih.gov anotherPerson@nih.gov
+$ mmc groups add_emails BorgniaM.Project1 -emails newTrainee@nih.gov anotherPerson@nih.gov
 {'project': 'BorgniaM.Project1', 'emails': ['newTrainee@nih.gov', 'anotherPerson@nih.gov']}
 ############################################################
 Group:          BorgniaM
@@ -198,7 +218,7 @@ There is a command to list all groups or a specific one.
 
 ```
 # Example
-$ mmc.py groups list
+$ mmc groups list
 {'name': '__all__'}
 ############################################################
 Group:          BorgniaM
@@ -218,7 +238,7 @@ Pojects:
 
 ```
 #Example 2
-$ mmc.py groups list -name BorgniaM
+$ mmc groups list -name BorgniaM
 {'name': '__all__'}
 ############################################################
 Group:          BorgniaM
@@ -250,10 +270,10 @@ Before running a session, it has to be created. There is a specific command to s
 
 Many arguments need to be provided to this command. The touroughness helps in ensuring proper bookkeeping about the data collection sessions. Especially at the time of writing the materials and methods section of a new manuscript.
 
-To learn all the arguments to the setup command, please use `mmc.py session setup -h`
+To learn all the arguments to the setup command, please use `mmc session setup -h`
 ```
 # Minimal command example
-mmc.py session setup -source /mnt/gatan_Raid_X/test_pyp/ \
+mmc session setup -source /mnt/gatan_Raid_X/test_pyp/ \
                      -sample ApoferritinSample1
                      -group testing \
                      -project test_transfer \
@@ -267,7 +287,7 @@ mmc.py session setup -source /mnt/gatan_Raid_X/test_pyp/ \
 The following detailed examples show how the gain reference and the files pattern can be specificed in case multiple sessions are in the same source directory.
 ```
 # More detailed command example
-mmc.py session setup -source /mnt/gatan_Raid_X/test_pyp/ \
+mmc session setup -source /mnt/gatan_Raid_X/test_pyp/ \
                      -sample ApoferritinSample1
                      -group testing \
                      -project test_transfer \
@@ -288,21 +308,21 @@ Note the output of the command: The session name is `20221011_ApoferritinSample1
 The edit the run, the command can be rerun. Alternatively, the yaml file can be modified directly with a text editor.
 
 ### Run the file transfer for a session
-After creation, a session can be run for preprocessing and file transfer. The command for starting the file transfer is `mmc.py session transfer`. The following arguments will need to be provided:
+After creation, a session can be run for preprocessing and file transfer. The command for starting the file transfer is `mmc session transfer`. The following arguments will need to be provided:
 - The session name
 - The expected duration of the run in hours
 - Whether or not to move the raw data to the cluser (optional)
 
 ```
-$ mmc.py session transfer 20221011_ApoferritinSample1 -duration 16
+$ mmc session transfer 20221011_ApoferritinSample1 -duration 16
 ```
 **It is recommended to use tmux or screen to run this command**
 
 ### Start the Scipion preprocessing
-The created session can also be preprocessed with Scipion automatically with the `mmc.py session preprocess` command. The command will create a scipion project for the session and initiate the project when the gain reference file has been transfered.
+The created session can also be preprocessed with Scipion automatically with the `mmc session preprocess` command. The command will create a scipion project for the session and initiate the project when the gain reference file has been transfered.
 
 ```
-$ mmc.py session preprocess 20221011_ApoferritinSample1 -duration 16
+$ mmc session preprocess 20221011_ApoferritinSample1 -duration 16
 ```
 
 ## Directory Structure and files
@@ -333,3 +353,62 @@ Automated emails will be send upon errors and idling in transfers.
 - **On errors**: An email will be sent to all addresses in `config/contact_emails.txt`. It will contain the information in `session.yaml` and a traceback of the error to help with troubleshooting.
 - **On idle**: If no new files have been found in the source directory for a certain period (45 minutes), an warning email will be sent to all addresses in `config/contact_emails.txt`. This email doesn't mean that something is wrong but may uncover an underlying error in the microscope software or simply inform that all targets were acquired.
 - **On completition**: When the session duration has been met, a completion email will be sent to all addresses in `config/contact_emails.txt` as well as all adresses attached in the session's project. It will inform the "owners" of the specimen that their data collection has finished and give them a copy of the microscope parameters, number of images, duration[...] that is saved in `session.yaml`
+
+# Frontend Development
+
+The web frontend is a Vue 3 application located in `frontend/mmc-vue/`. It communicates with the MMC REST API.
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) (v16 or later recommended)
+- npm (included with Node.js)
+
+## Setup
+
+Install dependencies:
+```
+cd frontend
+npm install --prefix mmc-vue
+```
+
+## Running the development server
+
+```
+npm run serve
+```
+
+This starts a hot-reloading dev server, typically at `http://localhost:8080`. The server is configured to allow connections from the host `mri20-dtn01` (see `vue.config.js`). To allow a different host during development, edit the `allowedHosts` field in `frontend/mmc-vue/vue.config.js`:
+```js
+devServer: { allowedHosts: ['your-hostname'] }
+```
+
+## Connecting to the REST API
+
+The frontend expects the MMC REST API to be running. Start it with:
+```
+uv run mmc-api
+```
+
+### Configuring the API URL (frontend)
+
+The frontend reads the API base URL from `frontend/mmc-vue/.env`:
+```
+VITE_API_ROOT=http://mri20-dtn01:8000/
+```
+Copy `frontend/mmc-vue/.env.template` to `frontend/mmc-vue/.env` and set the hostname/port to match your deployment.
+
+### Configuring allowed origins (backend)
+
+The REST API restricts cross-origin requests to the origins listed in `config/.env`:
+```
+cors_origins = '["http://localhost", "http://localhost:8080", "http://mri20-dtn01:8080"]'
+```
+Add any hostname:port from which the frontend will be served.
+
+## Building for production
+
+```
+npm run build
+```
+
+The compiled output will be in `frontend/mmc-vue/dist/`. Serve that directory with any static file server or configure the REST API to serve it directly.

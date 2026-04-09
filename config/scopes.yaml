@@ -1,0 +1,9 @@
+krios2:
+  voltage: 300
+  sphericalAberration: 2.7
+  amplitudeContrast: 0.1
+  gainRot: 0
+  gainFlip: 0
+  filesPattern: "*.eer"
+  gainPattern: "*.gain"
+  gpuList: "2 3"

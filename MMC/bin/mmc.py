@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 os.umask(int('002'))
 
 
-if __name__ == "__main__":
+def main():
     args = sys.argv
-    if len(args) == 1 or 'help' in args:
+    if len(args) == 1 or any(a in args for a in ('help', '-h', '--help')):
         cli.general_parser(settings.commands)
         sys.exit(0)
     command = settings.commands[args[1]][args[2]]
@@ -29,5 +29,9 @@ if __name__ == "__main__":
         method(parsed_args)
         sys.exit(0)
     asyncio.run(method(**parsed_args))
+
+
+if __name__ == "__main__":
+    main()
 
     

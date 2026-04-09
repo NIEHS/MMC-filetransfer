@@ -132,7 +132,7 @@ def load_storageLocations(file) -> List[StorageLocation]:
         storageLocations = yaml.safe_load(f)
     output_storageLocations = dict()
     for location, value in storageLocations.items():
-        output_storageLocations[location] = storageLocationsFactory[value['storage_type']].parse_obj(value)
+        output_storageLocations[location] = storageLocationsFactory[value['storage_type']].model_validate(value)
     return output_storageLocations
 
 

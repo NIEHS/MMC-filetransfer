@@ -1,20 +1,26 @@
 <template>
-      <button class="btn btn-primary" @click="logs">Logs</button>
+  <div class="d-flex flex-column gap-2">
+    <button class="btn btn-sm btn-primary" @click="logs">Logs</button>
+    <TransferControl :session="sessionName"></TransferControl>
+  </div>
 </template>
 
 <script>
-import {sessionLog } from '../store.js'
 import { toRef } from 'vue'
+import { sessionLog } from '../store.js'
+import TransferControl from './TransferControl.vue'
 
 export default {
     name: 'SessionDetail',
+    components: {
+      TransferControl,
+    },
     props: {
         session: String,
       },
     setup(props) {
       const sessionName = toRef(props, 'session')
-      console.log('SessionName', sessionName)
-      return {sessionName} 
+      return { sessionName }
     },
     methods: {
       logs() {

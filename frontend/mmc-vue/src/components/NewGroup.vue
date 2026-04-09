@@ -5,9 +5,7 @@
             <input id='newGroupName' class="form-control" v-model="group.name">
             <label for="newGroupAffiliation">Affiliation</label>
             <select id="newGroupAffiliation" class="form-control" v-model="group.affiliation">
-              <option>NIEHS</option>
-              <option>NICE</option>
-              <option>Collaborations</option>
+              <option v-for="aff in affiliations" :key="aff" :value="aff">{{ aff }}</option>
             </select>
             <button class="btn btn-primary" @click="submit">Create</button>
         </div>
@@ -15,24 +13,30 @@
 </template>
 
 <script>
-// import fetchingAPI from '../plugins/fectchingAPI.js'
-
 import { store } from '@/store';
-import { reactive } from 'vue';
+import { reactive, ref, onMounted } from 'vue';
 import postingAPI from '../plugins/postingAPI.js'
+import fetchingAPI from '../plugins/fectchingAPI.js'
 
 export default {
     name: 'NewGroup',
-    // props: {
-    //     newGroupElement: String,
-    //   },
     setup() {
+        const affiliations = ref([])
         const group = reactive({
             name: "",
-            affiliation: "NIEHS"
+            affiliation: ""
         })
-        // const GroupElement =  ref(props.newGroupElement)
-        return { group }
+
+        onMounted(async () => {
+            const { response, fetchData } = fetchingAPI('groups/affiliations/')
+            await fetchData()
+            affiliations.value = response.value
+            if (affiliations.value.length > 0) {
+                group.affiliation = affiliations.value[0]
+            }
+        })
+
+        return { group, affiliations }
     },
     methods: {
       submit(e) {
@@ -41,7 +45,7 @@ export default {
         postData()
         if (errors.value == null) {
           store.groups = response}
-      
+
         return {response, errors, fetching}
       }
     }

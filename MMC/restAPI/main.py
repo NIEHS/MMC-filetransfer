@@ -12,9 +12,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from MMC import settings
 
-import auth
-import groups
-import sessions
+from MMC.restAPI import auth
+from MMC.restAPI import groups
+from MMC.restAPI import sessions
 
 logger = logging.getLogger(__name__)
 
@@ -24,16 +24,11 @@ app.include_router(groups.groups)
 app.include_router(sessions.sessions)
 app.add_exception_handler(auth.NotAuthenticatedException,auth.not_authenticated_exception_handler)
 
-templates = Jinja2Templates(directory="templates")
-origins = [
-    "http://localhost",
-    "http://localhost:8080",
-    "http://mri20-dtn01:8080"
-]
+templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.env.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -102,5 +97,10 @@ async def login_submit(form_data: auth.OAuth2PasswordRequestFormData):
     return f"Bearer {token['access_token']}"
 
 
+def start():
+    import uvicorn
+    uvicorn.run("MMC.restAPI.main:app", host="0.0.0.0", port=8000, reload=True)
 
-    
+
+if __name__ == "__main__":
+    start()
