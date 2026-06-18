@@ -1,3 +1,10 @@
+
+This repository has been archived and is no longer maintained.
+The code is provided for historical reference and may contain unpatched or unknown vulnerabilities.
+It should not be used in production systems.
+
+
+
 # MMC file transfer and preprocessing
 
 This python package is mainly used to transfer raw data from cryo-TEM data collection from the microscope computer to staging, long-term and computing cluster areas and simplify the preprocessing of the data. It organizes the data into groups and projects during filetransfer.
